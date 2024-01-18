@@ -13,6 +13,7 @@ namespace IO {
             : start_byte(start_byte), nbytes(nbytes)
         {
         }
+        virtual void* get_buffer() = 0;
         virtual ~DataBufferBase() = default;
 
     };
@@ -28,6 +29,11 @@ namespace IO {
                 buffer = std::unique_ptr<DTYPE[]>(safe_new_1D<DTYPE>(nbytes, __func__));;
             }
             ~DataBuffer() {}
+
+            void* get_buffer() override
+            {
+                return static_cast<void*>(buffer.get());
+            }
 
             //overload the [] operator to index the buffer when called data_buffer[i]
             DTYPE &operator[](std::size_t i)
