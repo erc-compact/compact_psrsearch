@@ -1,45 +1,49 @@
 #include "utils/gen_utils.hpp"
 #include <memory>
+#include <cstring> 
+
 namespace IO {
 
     class DataBufferBase
     {
 
-    public:
-        std::size_t start_byte;
-        std::size_t nbytes;
+    protected:
+        std::size_t startByte;
+        std::size_t nBytes;
 
-        DataBufferBase(std::size_t start_byte, std::size_t nbytes)
-            : start_byte(start_byte), nbytes(nbytes)
+        DataBufferBase(std::size_t startByte, std::size_t nBytes)
+            : startByte(startByte), nBytes(nBytes)
         {
         }
-        virtual void* get_buffer() = 0;
+        virtual void* getBuffer() = 0;
         virtual ~DataBufferBase() = default;
-
     };
 
     template <class DTYPE>
     class DataBuffer : public DataBufferBase
     {
         public:
-            std::unique_ptr<DTYPE[]> buffer;
-            DataBuffer(std::size_t start_byte, std::size_t nbytes)
-                : DataBufferBase(start_byte, nbytes)
+            std::shared_ptr<DTYPE[]> buffer;
+            DataBuffer(std::size_t startByte, std::size_t nBytes)
+                : DataBufferBase(startByte, nBytes)
             {
-                buffer = std::unique_ptr<DTYPE[]>(safe_new_1D<DTYPE>(nbytes, __func__));;
+                buffer = std::shared_ptr<DTYPE[]>(safeNew1D<DTYPE>(nBytes, __func__));;
             }
             ~DataBuffer() {}
 
-            void* get_buffer() override
-            {
+            void* getBuffer() override {
                 return static_cast<void*>(buffer.get());
             }
 
-            //overload the [] operator to index the buffer when called data_buffer[i]
-            DTYPE &operator[](std::size_t i)
-            {
-                return buffer[i];
+            //overload the [] operator
+            DTYPE& operator[](std::size_t idx) {
+                return buffer[idx];
             }
+
+            void clearBuffer() {
+                std::memset(buffer.get(), 0, nBytes);
+            }
+            
 
             
 
