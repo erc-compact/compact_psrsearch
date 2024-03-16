@@ -1,14 +1,20 @@
+#pragma once
 #include <iostream>
+#include <sstream>
 #include "dedisp.h"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "cufft.h"
+#include <fstream>
+#include <execinfo.h>
 
 
 class CustomException : public std::exception
 {
+protected:
     std::string message;
 public:
+    CustomException() { }
     CustomException(std::string message)
     {
         this->message = message;
@@ -28,6 +34,17 @@ public:
         std::string message = "File format not recognised for file: " + file_name;
         this->message = message;
     }
+};
+
+class HeaderParamNotFound : public CustomException
+{
+  public:
+    HeaderParamNotFound(std::string key) 
+    {
+        std::string message = "Header does not have key: " + key;
+        this->message = message;
+    }
+
 };
 
 
