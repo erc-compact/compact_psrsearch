@@ -12,46 +12,46 @@
 using namespace IO;
 
 
-SearchModeFile* SearchModeFile::createInstance(std::string file_name, std::string mode, std::string file_type){
+SearchModeFile* SearchModeFile::createInstance(std::string fileName, std::string mode, std::string fileType){
 
             SearchModeFile *searchFileObj;
 
-            if(file_type.empty()){
-                file_type = guessFileType(file_name);
+            if(fileType.empty()){
+                fileType = guessFileType(fileName);
             }
 
-            if (caseInsensitiveCompare(file_type, "filterbank") || 
-                caseInsensitiveCompare(file_type, "sigproc_filterbank") || 
-                caseInsensitiveCompare(file_type, "fil")){
-                    searchFileObj = new IO::SigprocFile();
+            if (caseInsensitiveCompare(fileType, "filterbank") || 
+                caseInsensitiveCompare(fileType, "sigproc_filterbank") || 
+                caseInsensitiveCompare(fileType, "fil")){
+                    searchFileObj = new SigprocFile(fileName, mode);
             }
-            // else if (caseInsensitiveCompare(file_type, "presto_timeseries") || 
-            //          caseInsensitiveCompare(file_type, "presto")){
-            //     searchFileObj = new PrestoTimeSeries();
-            // }
-            // else if (caseInsensitiveCompare(file_type, "tim") || 
-            //          caseInsensitiveCompare(file_type, "sigproc_timeseries")){
-            //     searchFileObj = new SigprocTimeSeries();
-            // }
+            else if (caseInsensitiveCompare(fileType, "presto_timeseries") || 
+                     caseInsensitiveCompare(fileType, "presto")){
+                searchFileObj = new PrestoTimeSeries(fileName, mode);
+            }
+            else if (caseInsensitiveCompare(fileType, "tim") || 
+                     caseInsensitiveCompare(fileType, "sigproc_timeseries")){
+                searchFileObj = new SigprocTimeSeries(fileName, mode);
+            }
             else{
-                throw FileFormatNotRecognised(file_type);
+                throw FileFormatNotRecognised(fileType);
             }
 
 }
 
-std::string SearchModeFile::guessFileType(std::string file_name){
-            std::string file_type;
-            std::string extension = file_name.substr(file_name.find_last_of(".") + 1);
+std::string SearchModeFile::guessFileType(std::string fileName){
+            std::string fileType;
+            std::string extension = fileName.substr(fileName.find_last_of(".") + 1);
             if (caseInsensitiveCompare(extension, "fil") || caseInsensitiveCompare(extension, "filterbank") || caseInsensitiveCompare(extension, "sigproc_filterbank")){
-                file_type = "filterbank";
+                fileType = "filterbank";
             }
             else if (caseInsensitiveCompare(extension, "dat")){
-                file_type = "presto_timeseries";
+                fileType = "presto_timeseries";
             }
             else{
                 throw FileFormatNotRecognised(extension);
             }
-            return file_type;
+            return fileType;
         }
 
 
@@ -62,19 +62,14 @@ std::string SearchModeFile::guessFileType(std::string file_name){
  * @param key The key of the header parameter to retrieve.
  * @return A pointer to the header parameter if found, otherwise NULL.
  */
-HeaderParamBase *SearchModeFile::getHeaderParam(std::string key)
-{
+HeaderParamBase* SearchModeFile::getHeaderParam(std::string key) {
 
     std::map<std::string, HeaderParamBase *>::iterator it = headerParams.find(key);
-    if (it != headerParams.end())
-    {
-        return it->second;
-    }
-    return NULL
+    if (it != headerParams.end()) return it->second;
+    return nullptr;
 }
 
-void SearchModeFile::removeHeaderParam(std::string key)
-{
+void SearchModeFile::removeHeaderParam(std::string key) {
    
     std::map<std::string, HeaderParamBase *>::iterator it = headerParams.find(key);
     if (it != headerParams.end()) headerParams.erase(it);
@@ -82,8 +77,7 @@ void SearchModeFile::removeHeaderParam(std::string key)
     
 }
 
-void SearchModeFile::prettyPrint_header()
-{
+void SearchModeFile::prettyPrintHeader() {
     int max_key_length = 3, max_value_length = 5;
 
     //iterate through the header params and find the max key and value length
@@ -110,8 +104,7 @@ void SearchModeFile::prettyPrint_header()
     }
 }
 
-void SearchModeFile::print_header()
-{
+void SearchModeFile::printHeader() {
     for (std::map<std::string, HeaderParamBase *>::iterator it = headerParams.begin(); it != headerParams.end(); ++it)
     {
         HeaderParamBase *base = it->second;
@@ -158,53 +151,48 @@ void SearchModeFile::print_header()
     }
 }
 
-std::size_t SearchModeFile::samplesToBytes(std::size_t nsamples)
-{
+std::size_t SearchModeFile::samplesToBytes(std::size_t nsamples) {
     int nChans = getValueForKey<int>(NCHANS);
     int nBits = getValueForKey<int>(NBITS);
     int nbytes = nBits / 8;
     return nsamples * nChans * nbytes;
 }
 
-std::size_t SearchModeFile::bytesToSamples(std::size_t nBytes)
-{
+std::size_t SearchModeFile::bytesToSamples(std::size_t nBytes) {
     int nChans = getValueForKey<int>(NCHANS);
     int nBits = getValueForKey<int>(NBITS);
     int numBytesPerSample = nBits / 8;
     return nBytes / nChans / numBytesPerSample;
 }
 
-std::size_t SearchModeFile::timeToBytes(std::size_t nsecs)
-{
+std::size_t SearchModeFile::timeToBytes(std::size_t nsecs) {
     std::size_t samples = nsecs / getValueForKey<double>(TSAMP);
     return samplesToBytes(samples);
 }
 
-std::size_t getTotalDataSize()
-{
-    return this->nBytesFromDisk;
+std::size_t SearchModeFile::getTotalDataSize() {
+    return this->nBytesOnDisk;
 }
 
-double SearchModeFile::get_mean()
-{
+double SearchModeFile::getMean() {
     std::size_t nSamps = getValueForKey<long>(NSAMPS);
     double mean = 0.0;
     for (std::size_t i = 0; i < nSamps; ++i)
     {
-        mean += data[i];
+        mean += (*this->container)[i];
     }
     return mean / nSamps;
 }
 
-double SearchModeFile::get_rms()
-{
+double SearchModeFile::getRMS() {
     long nSamps = getValueForKey<long>(NSAMPS);
     double sumsq = 0.0;
     double sum = 0.0;
     for (std::size_t i = 0; i < nSamps; ++i)
-    {
-        sumsq += data[i] * data[i];
-        sum += data[i];
+    {   
+        float data = (*this->container)[i];
+        sumsq += (data * data);
+        sum += data;
     }
     double mean = sum / nSamps;
     double rms = std::sqrt(sumsq / nSamps - mean * mean);
@@ -212,51 +200,44 @@ double SearchModeFile::get_rms()
 }
 
 
-void SearchModeFile::skip_samples(long nsamples)
-{
-    skip_bytes(samplesToBytes(nsamples));
-}
-void SearchModeFile::skip_time(double nsecs)
-{
-    skip_bytes(timeToBytes(nsecs));
+void SearchModeFile::skipSamples(std::size_t nsamples) {
+    skipBytes(samplesToBytes(nsamples));
 }
 
-void SearchModeFile::goto_sample(int isample)
-{
-    go_to_byte(samplesToBytes(isample));
-}
-void SearchModeFile::goto_timestamp(double itime)
-{
-    goto_byte(timeToBytes(itime));
+void SearchModeFile::skipTime(double nsecs) {
+    skipBytes(timeToBytes(nsecs));
 }
 
-void SearchModeFile::read_nsecs(double start_sec, double nsecs)
-{
-    std::size_t nbytes = timeToBytes(nsecs);
-    std::size_t start_byte = timeToBytes(start_sec);
-    readNBytes(start_byte, nbytes);
+void SearchModeFile::gotoSample(std::size_t isample) {
+    goToByte(samplesToBytes(isample));
+}
+
+void SearchModeFile::gotoTimestamp(double itime) {
+    goToByte(timeToBytes(itime));
+}
+
+void SearchModeFile::readNSecs(double startSec, double nSecs) {
+    std::size_t nBytes = timeToBytes(nSecs);
+    std::size_t startByte = timeToBytes(startSec);
+    readNBytes(startByte, nBytes);
 
 }
 
-void SearchModeFile::read_nSamps(std::size_t start_sample, std::size_t num_samples)
-{
-    nbytes = samplesToBytes(num_samples);
-    start_byte = samplesToBytes(start_sample);
-    readNBytes(start_byte, nbytes);
+void SearchModeFile::readNSamps(std::size_t startSample, std::size_t numSamples) {
+    std::size_t  nBytes = samplesToBytes(numSamples);
+    std::size_t startByte = samplesToBytes(startSample);
+    readNBytes(startByte, nBytes);
 }
 
-void SearchModeFile::skip_bytes(std::size_t nbytes)
-{
-    fseek(this->dataFile, bytes_to_skip, SEEK_CUR);
+void SearchModeFile::skipBytes(std::size_t nBytes) {
+    fseek(this->dataFile, nBytes, SEEK_CUR);
 }
 
-void SearchModeFile::goto_byte(std::size_t byte)
-{
+void SearchModeFile::goToByte(std::size_t byte) {
     fseek(this->dataFile, byte, SEEK_SET);
 }
 
 
-void SearchModeFile::nsamples_in_buffer()
-{
-    return this->data_buffer->nbytes / this->nChans / this->nBits / 8;
+void SearchModeFile::nSamplesInBuffer() {
+    return this->container->nBytes / this->nChans / this->nBits / BITS_PER_BYTE;
 }
