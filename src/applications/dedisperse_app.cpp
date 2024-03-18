@@ -8,12 +8,7 @@
 #include "exceptions.hpp"
 #include "data/multi_timeseries.hpp"
 #include "applications/common_arguments.hpp"
-#include "TCLAP/CmdLine.h"
-#include "data/Dedisperser.hpp"
-#include "data/DedisperseCommandArgs.hpp"
-#include "data/SearchModeFile.hpp"
-#include "utils/generateListFromAsciiMaskFile.hpp"
-#include "exceptions/CustomException.hpp"
+#include "tclap/CmdLine.h"
 #include <vector>
 #include <cassert>
 #include <memory>
