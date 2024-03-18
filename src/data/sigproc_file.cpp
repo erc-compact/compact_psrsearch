@@ -16,15 +16,15 @@
 IO::SigprocFile::SigprocFile(std::string file_name, std::string mode)
 {
 
-    read_header_keys();
+    readHeaderKeys();
 
-    if (mode == FILREAD)
+    if (mode == READ)
     {
-        read_header();
-        this->nBytesFromDisk = this->nSamps * this->nChans * this->nBits / BITS_PER_BYTE;
-        this->nBytesOnRam = this->nBytesFromDisk * BITS_PER_BYTE / this->nBits;
+        readHeader();
+        this->nBytesOnDisk = this->nSamps * this->nChans * this->nBits / BITS_PER_BYTE;
+        this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
     }
-    else if (mode == FILWRITE)
+    else if (mode == WRITE)
     {
         std::cerr << "Nothing to initialise for " << mode << " mode for file: " << file_name << std::endl;
     }
@@ -37,17 +37,17 @@ IO::SigprocFile::SigprocFile(std::string file_name, std::string mode)
  *
  * @return int Returns 0 if the header keys are successfully read, otherwise returns an error code.
  */
-int IO::SigprocFile::read_header_keys()
+void IO::SigprocFile::readHeaderKeys()
 {
-    std::ifstream header_keys_file(HEADER_KEYS_FILE);
+    std::ifstream headerKeysFile(HEADER_KEYS_FILE);
     std::string line;
 
-    while (std::getline(header_keys_file, line))
+    while (std::getline(headerKeysFile, line))
     {
-        std::istringstream line_Stream(line);
+        std::istringstream lineStream(line);
         std::string key;
         std::string dtype;
-        if (!(line_Stream >> key >> dtype))
+        if (!(lineStream >> key >> dtype))
         {
             fprintf(stderr, "Error parsing header_keys file at this line: %s \n", line.c_str());
             break;
@@ -70,15 +70,14 @@ int IO::SigprocFile::read_header_keys()
         }
     }
 
-    return EXIT_SUCCESS;
 }
 
 /**
  * Opens the header file, if different from the data file.
  */
-void IO::SigprocFile::open_headerFile()
+void IO::SigprocFile::openHeaderFile()
 {
-    if (this->headerFileOpen || !this->is_header_separate)
+    if (this->headerFileOpen || !this->isHeaderSeparate())
         return;
 
     fileOpen(&headerFile, this->headerFileName, this->mode);
@@ -88,31 +87,29 @@ void IO::SigprocFile::open_headerFile()
 /**
  * Closes the header file associated with the SigprocFile object.
  */
-void IO::SigprocFile::close_headerFile()
+void IO::SigprocFile::closeHeaderFile()
 {
     fclose(headerFile);
     this->headerFileOpen = false;
-    return EXIT_SUCCESS;
 }
 
-void IO::SigprocFile::open_dataFile()
+void IO::SigprocFile::openDataFile()
 {
 
     if (this->dataFileOpen)
-        return return;
+        return;
 
     fileOpen(&dataFile, this->dataFileName, this->mode);
     this->dataFileOpen = true;
 }
 
-void IO::SigprocFile::close_dataFile()
+void IO::SigprocFile::closeDataFile()
 {
     fclose(dataFile);
     this->dataFileOpen = false;
-    return EXIT_SUCCESS;
 }
 
-bool IO::SigprocFile::is_header_separate()
+bool IO::SigprocFile::isHeaderSeparate()
 {
     return false;
 }
@@ -124,13 +121,10 @@ bool IO::SigprocFile::is_header_separate()
  *
  * @return The number of bytes in the header.
  */
-void IO::SigprocFile::read_header()
+void IO::SigprocFile::readHeader()
 {
 
-    if(! is_headerFileOpen){
-        open_headerFile();
-    }
-
+    openHeaderFile();
     rewind(headerFile);
 
     int iter = 0;
@@ -161,21 +155,21 @@ void IO::SigprocFile::read_header()
                     headerBytes = ftell(headerFile);
                     int inp_num;
                     inp_num = fileno(headerFile);
-                    if ((fstat(inp_num, &filestat)) < 0)
+                    if ((fstat(inp_num, &headerFileStat)) < 0)
                     {
                         std::cerr << "ERROR:  could not fstat file: " << headerFile << std::endl;
                         break;
                     }
-                    data_bytes = filestat.st_size - headerBytes;
+                    dataBytes = headerFileStat.st_size - headerBytes;
                     int nChans = getValueForKey<int>(NCHANS);
                     int nBits = getValueForKey<int>(NBITS);
                     int nifs = getValueForKey<int>(NIFS);
                     double tsamp = getValueForKey<double>(TSAMP);
                     int nbytes = nBits / 8;
-                    long nsamples = data_bytes / (nChans * nbytes * nifs);
+                    long nsamples = dataBytes / (nChans * nbytes * nifs);
                     double tobs = nsamples * tsamp;
-                    add_to_header<long>(NSAMPLES, LONG, nsamples);
-                    add_to_header<double>(TOBS, DOUBLE, tobs);
+                    addToHeader<long>(NSAMPLES, LONG, nsamples);
+                    addToHeader<double>(TOBS, DOUBLE, tobs);
 
                     this->nChans = nChans;
                     this->nBits = nBits;
@@ -231,156 +225,107 @@ void IO::SigprocFile::read_header()
     this->header_size = headerBytes;
 }
 
-void IO::SigprocFile::write_header()
+void IO::SigprocFile::writeHeader()
 {
-    if (mode != std::string((char *)FILWRITE) && mode != std::string((char *)VIRTUALFIL))
+    if (mode != std::string((char *)WRITE) && mode != std::string((char *)VIRTUALFIL))
     {
         std::cerr << " File not opened in write mode aborting now. " << std::endl;
     }
 
-    int header_start_length = std::strlen(HEADER_START);
-    fwrite(&header_start_length, sizeof(int), 1, headerFile);
-    fwrite(HEADER_START, sizeof(char), header_start_length, headerFile);
-    for (std::vector<HeaderParamBase *>::iterator it = headerParams.begin(); it != headerParams.end(); ++it)
-    {
-        HeaderParamBase *base = *it;
+    int headerStartLength = HEADER_START.length();
+    fwrite(&headerStartLength, sizeof(int), 1, headerFile);
+    fwrite(HEADER_START.c_str(), sizeof(char), headerStartLength, headerFile);
 
-        const char *key = (*it)->key.c_str();
-        if (!std::strcmp(key, HEADER_START) || !std::strcmp(key, HEADER_END) || !std::strcmp(key, NSAMPLES) || !std::strcmp(key, TOBS) || !base->inheader)
-            continue;
-        int key_length = std::strlen(key);
-        fwrite(&key_length, sizeof(int), 1, headerFile);
-        fwrite(key, sizeof(char), key_length, headerFile);
+    
 
-        if (base->dtype == std::string(INT))
-        {
+    for (const auto& [key, base] : headerParams) {
+        if(!key.compare(HEADER_START) || !key.compare(HEADER_END) || !key.compare(NSAMPLES) || !key.compare(TOBS) || !base->inheader) continue;
+        int keyLength = key.length();
+        fwrite(&keyLength, sizeof(int), 1, headerFile);
+        fwrite(key.c_str(), sizeof(char), keyLength, headerFile);
+
+        if (base->dtype == std::string(INT)) {
             int value = (static_cast<HeaderParam<int> *>(base))->value;
             fwrite(&value, sizeof(value), 1, headerFile);
         }
-        else if (base->dtype == std::string(DOUBLE))
-        {
+        else if (base->dtype == std::string(DOUBLE)) {
             double value = (static_cast<HeaderParam<double> *>(base))->value;
             fwrite(&value, sizeof(value), 1, headerFile);
         }
-        else if (base->dtype == std::string(STRING))
-        {
+        else if (base->dtype == std::string(STRING)) {
             char *value = (static_cast<HeaderParam<char *> *>(base))->value;
-            if (value != NULL)
-            {
+            if (value != NULL) {
                 int value_length = std::strlen(value);
                 fwrite(&value_length, sizeof(int), 1, headerFile);
                 fwrite(value, sizeof(*value), value_length, headerFile);
             }
-            else
-            {
+            else {
                 int value_length = 0;
                 fwrite(&value_length, sizeof(value_length), 1, headerFile);
             }
         }
-        else if (base->dtype == std::string(NULL_STR))
-        {
+        else if (base->dtype == std::string(NULL_STR)){
             int null = 0;
             fwrite(&null, sizeof(null), 1, headerFile);
         }
     }
 
-    int header_end_length = std::strlen(HEADER_END);
-    fwrite(&header_end_length, sizeof(int), 1, headerFile);
-    fwrite(HEADER_END, sizeof(char), header_end_length, headerFile);
+    int headerEndLength = HEADER_END.length();
+    fwrite(&headerEndLength, sizeof(int), 1, headerFile);
+    fwrite(HEADER_END.c_str(), sizeof(char), headerEndLength, headerFile);
 }
 
-void IO::SigprocFile::read_all_data()
+void IO::SigprocFile::readAllData()
 {
-    readNBytes(this->nBytesFromDisk);
+    readNBytes(0, this->nBytesOnDisk);
 }
 
-
-unsigned char extract_bits_to_byte(unsigned char byte, unsigned char b1, unsigned char b2)
-{
-    // Create a mask with ones in the positions from b1 to b2
-    unsigned char mask = ((1 << (b2 - b1 + 1)) - 1) << b1;
-
-    // Apply the mask to the byte and shift the result to the rightmost position
-    unsigned char result = (byte & mask) >> b1;
-
-    return result;
-}
-void IO::SigprocFile::readNBytes(std::size_t startByte, std::size_t nBytes)
-{
-    if (this->data_buffer != NULL)
-        throw InvalidBufferStateException("Buffer already allocated, cannot allocate again");
-
-    this->nBytesFromDisk = nBytes;
-    this->nBytesOnRam = nBytes * BITS_PER_BYTE / this->nBits;
-    this->data_buffer = safeNew1D<DTYPE>(nBytesOnRam, __func__);
-
-    double nBits = this->nBits;
-
-    // go to start byte
-    fseek(dataFile, startByte, SEEK_SET);
-
-    if (nBits == 8)
-    { // easy, just read the whole thing into buffer directly
-        std::size_t count = fread(this->data_buffer->buffer, sizeof(DTYPE), nBytesFromDisk, this->dataFile);
-        static_assert(count == nBytes, "Error in reading data, nbytes != count");
-        return;
-    }
-
-    std::size_t ngulps = this->gulpSize > 0 ? nBytes / this->gulpSize : nBytes std::size_t total_bytes_read = 0;
-    std::size_t global_idx = 0;
-
-    while (total_bytes_read < nBytes)
+void IO::SigprocFile::readNBytes(std::size_t startByte, std::size_t nBytes) {
+    this->nBytesOnDisk = nBytes;
+    this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
+    switch (this->nBits)
     {
-
-        std::size_t bytes_to_read = std::min(this->gulpSize, nBytes - total_bytes_read);
-
-        if (bytes_to_read % nBits != 0)
-        {
-            bytes_to_read = (bytes_to_read / nBits - 1) * nBits; // to get edge cases and non multiples
-        }
-
-        DTYPE *temporary_buffer = safeNew1D<DTYPE>(bytes_to_read, __func__);
-        std::size_t count = fread(temporary_buffer, sizeof(DTYPE), bytes_to_read, this->dataFile);
-        static_assert(count == bytes_to_read, "Error in reading data, nbytes != bytes_to_read");
-
-        if (nBits < 8)
-        {
-            for (int byte = 0; byte < bytes_to_read; byte++) // iterate over each byte
-            {
-                unsigned char byte_value = temporary_buffer[byte]; // get the byte value
-
-                for (int bit_group = 0; bit_group < 8 / nBits; bit_group = bit_group++) // iterate over each bit group
-                {
-
-                    this->data_buffer->buffer[global_idx] = extract_bits_to_byte(byte_value, bit_group * nBits, (bit_group + 1) * nBits);
-                    global_idx++;
-                }
-            }
-        }
-        else
-        {
-            int num_bytes_per_value = nBits / 8;
-            // take nBits/8 bytes at a time and put them in the buffer
-            // for example, for 16 bits, convert to short and then convert to byte
-
-            while (ibyte < bytes_to_read)
-            {
-                std::size_t value = 0;
-                for (int k = 0; k < num_bytes_per_value; k++)
-                {
-                    this->data_buffer->buffer[global_idx] += temporary_buffer[ibyte + k] * pow(2, 8 * (num_bytes_per_value - k));
-                }
-                global_idx++;
-            }
-        }
-        static_assert(global_idx == nBytesOnRam, "Error in reading data, nBytesOnRam != global_idx");
-        delete[] temporary_buffer;
+    case 1:
+    case 2:
+    case 4:
+    case 8:
+        this->readNBytesOfType<SIGPROC_FILTERBANK_8_BIT_TYPE>(startByte, nBytes);
+        break;
+    case 16:
+        this->readNBytesOfType<SIGPROC_FILTERBANK_16_BIT_TYPE>(startByte, nBytes);
+        break;
+    case 32:
+        this->readNBytesOfType<SIGPROC_FILTERBANK_32_BIT_TYPE>(startByte, nBytes);
+        break;
     }
+
 }
 
+void IO::SigprocFile::writeNBytes(std::size_t startByte, std::size_t nBytes) {
+            this->nBytesOnDisk = nBytes;
+            this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
+            switch (this->nBits)
+            {
+            case 1:
+            case 2:
+            case 4:
+            case 8:
+                this->writeNBytesOfType<SIGPROC_FILTERBANK_8_BIT_TYPE>(startByte, nBytes);
+                break;
+            case 16:
+                this->writeNBytesOfType<SIGPROC_FILTERBANK_16_BIT_TYPE>(startByte, nBytes);
+                break;
+            case 32:
+                this->writeNBytesOfType<SIGPROC_FILTERBANK_32_BIT_TYPE>(startByte, nBytes);
+                break;
+            }
+    
+        }
 
 
-void IO::SigprocFile::write_all_data()
+
+
+void IO::SigprocFile::writeAllData()
 {
 
     fwrite(data, sizeof(unsigned char), data_bytes, dataFile);
@@ -469,7 +414,7 @@ void IO::SigprocFile::copy_data(std::size_t start_sample, std::size_t nsamples, 
     data_bytes += bytes_to_copy;
 }
 
-void IO::SigprocFile::write_all_data()
+void IO::SigprocFile::writeAllData()
 {
     writeNBytes(0, this->nBytesOnRam);
 }

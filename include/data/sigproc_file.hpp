@@ -14,130 +14,104 @@ namespace IO
 
     public:
         SigprocFile(std::string file_name, std::string mode);
-        virtual ~SigprocFile() = 0;
 
     public:
         std::string mode;
         bool verbose;
         std::size_t header_size;
-        void read_header_keys();
+        void readHeaderKeys();
 
-        void open_headerFile();
-        void close_headerFile();
+        void openHeaderFile();
+        void closeHeaderFile();
 
-        void open_dataFile();
-        void close_dataFile();
+        void openDataFile();
+        void closeDataFile();
 
-        bool is_header_separate();
+        bool isHeaderSeparate();
 
-        void read_header();
-        void write_header();
+        void readHeader();
+        void writeHeader();
 
-        void read_all_data();
-        void write_all_data();
+        void readAllData();
+        void writeAllData();
 
-        void readData(std::size_t start_byte, std::size_t nbytes) {
-            this->nBytesFromDisk = nbytes;
-            this->nBytesOnRam = this->nBytesFromDisk * BITS_PER_BYTE / this->nBits;
-            this->container = std::make_unique<DataBufferBase>(start_byte, nBytesOnRam);
+        void readNBytes(std::size_t startByte, std::size_t nBytes); 
+        void writeNBytes(std::size_t startByte, std::size_t nBytes);
 
+        template<typename DTYPE, typename = std::enable_if_t<std::is_arithmetic<DTYPE>::value>>
+        void readNBytesOfType(std::size_t startByte, std::size_t nBytes){
+
+            this->nBytesOnDisk = nBytes;
+            this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
+            this->container = std::make_unique<DataBuffer<DTYPE>>(startByte, nBytesOnRam);
+            
+            std::shared_ptr<DTYPE []> buffer = std::dynamic_pointer_cast<DTYPE[]>(this->container->getBuffer());
+            unsigned int nBits = this->nBits;
+            this->goToByte(startByte);
+
+            if (nBits == 8) { // easy, just read the whole thing into buffer directly
+                readFromFileAndVerify<DTYPE>(this->dataFile, nBytesOnDisk, buffer.get());
+                return;
+            }
+
+            else {
+                int bufferIdx = 0;
+                /* In this case, we read nBytesOnDisk from disk using temporary buffer, and convert to nBytesOnRam */
+                std::unique_ptr<std::byte> tempBuffer = std::make_unique<std::byte>(nBytesOnDisk);
+                readFromFileAndVerify<std::byte>(this->dataFile, nBytesOnDisk, tempBuffer.get());
+
+                if (nBits < 8) { // eg: 2 bits
+                    for (int byte = 0; byte < nBytesOnDisk; byte++) { // for each byte
+                        for (int bitGroup = 0; bitGroup < BITS_PER_BYTE / nBits; bitGroup++) { 
+                            buffer[bufferIdx] = extractBitsFromByte(tempBuffer[byte], bitGroup * nBits, (bitGroup + 1) * nBits); 
+                        }
+                    }
+                }
+                else
+                {
+                    unsigned char nBytesPerValue = nBits / BITS_PER_BYTE;   
+                    unsigned char ibyte=0;
+                    while (ibyte < nBytesOnDisk)
+                    {
+                        this->container->buffer[bufferIdx] = 0; // reset just in case it has some arbitrary undeleted previous value
+                        for (int k = nBytesPerValue -1; k >= 0; k--) 
+                                this->container->buffer[bufferIdx] |= static_cast<std::size_t>(tempBuffer[ibyte + k]) << (BITS_PER_BYTE * k);                        
+                        ibyte+=nBytesPerValue;
+                    }
+                }
+                bufferIdx++;
+            }
+
+        }
+
+        template<typename DTYPE, typename = std::enable_if_t<std::is_arithmetic<DTYPE>::value>>
+        void writeNBytesOfType(std::size_t startByte, std::size_t nBytes){
+
+            this->nBytesOnDisk = nBytes;
+            this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
+            std::shared_ptr<DTYPE []> buffer = std::dynamic_pointer_cast<DTYPE[]>(this->container->getBuffer());
+            unsigned int nBits = this->nBits;
+            this->goToByte(startByte);
             switch (this->nBits)
             {
             case 1:
             case 2:
             case 4:
             case 8:
-                this->readNBytes<SIGPROC_FILTERBANK_8_BIT_TYPE>(start_byte, nbytes);
+                this->writeNBytesOfType<SIGPROC_FILTERBANK_8_BIT_TYPE>(startByte, nBytes);
                 break;
             case 16:
-                this->readNBytes<SIGPROC_FILTERBANK_16_BIT_TYPE>(start_byte, nbytes);
+                this->writeNBytesOfType<SIGPROC_FILTERBANK_16_BIT_TYPE>(startByte, nBytes);
                 break;
             case 32:
-                this->readNBytes<SIGPROC_FILTERBANK_32_BIT_TYPE>(start_byte, nbytes);
+                this->writeNBytesOfType<SIGPROC_FILTERBANK_32_BIT_TYPE>(startByte, nBytes);
                 break;
             }
-            
-
-            
+    
         }
 
-        template <typename DTYPE>
-        void readNBytes(std::size_t start_byte, std::size_t nbytes){
-
-            this->nBytesFromDisk = nbytes;
-            this->nBytesOnRam = this->nBytesFromDisk * BITS_PER_BYTE / this->nBits;
-            this->container = std::make_unique<DTYPE>(start_byte, nBytesOnRam);
             
-            std::shared_ptr<DTYPE> buffer = std::reinterpret_pointer_cast<DTYPE>(this->container->getBuffer());
 
-            double nBits = this->nBits;
-
-            // go to start byte
-            fseek(dataFile, start_byte, SEEK_SET);
-
-            if (nBits == 8)
-            { // easy, just read the whole thing into buffer directly
-                std::size_t count = fread(buffer, sizeof(DTYPE), nBytesFromDisk, this->dataFile);
-                assert(count == nbytes, "Error in reading data, nbytes != count");
-                return;
-            }
-
-            std::size_t ngulps = this->gulpSize > 0 ? nbytes / this->gulpSize : nbytes;
-            std::size_t total_bytes_read = 0;
-            std::size_t global_idx = 0;
-
-            while (total_bytes_read < nbytes)
-            {
-
-                std::size_t bytes_to_read = std::min(this->gulpSize, nbytes - total_bytes_read);
-
-                if (bytes_to_read % nBits != 0)
-                {
-                    bytes_to_read = (bytes_to_read / nBits - 1) * nBits; // to get edge cases and non multiples
-                }
-
-                std::unique_ptr<DTYPE> temporary_buffer = std::make_unique<DTYPE>(bytes_to_read);
-
-                std::size_t count = fread(temporary_buffer, sizeof(DTYPE), bytes_to_read, this->dataFile);
-                static_assert(count == bytes_to_read, "Error in reading data, nbytes != bytes_to_read");
-
-                if (nBits < 8)
-                {
-                    for (int byte = 0; byte < bytes_to_read; byte++) // iterate over each byte
-                    {
-                        unsigned char byte_value = temporary_buffer[byte]; // get the byte value
-
-                        for (int bit_group = 0; bit_group < 8 / nBits; bit_group = bit_group++) // iterate over each bit group
-                        {
-
-                            buffer[global_idx] = extract_bits_to_byte(byte_value, bit_group * nBits, (bit_group + 1) * nBits);
-                            global_idx++;
-                        }
-                    }
-                }
-                else
-                {
-                    int num_bytes_per_value = nBits / 8;
-                    // take nBits/8 bytes at a time and put them in the buffer
-                    // for example, for 16 bits, convert to short and then convert to byte
-
-                    while (ibyte < bytes_to_read)
-                    {
-                        std::size_t value = 0;
-                        for (int k = 0; k < num_bytes_per_value; k++)
-                        {
-                            this->data_buffer->buffer[global_idx] += temporary_buffer[ibyte + k] * pow(2, 8 * (num_bytes_per_value - k));
-                        }
-                        global_idx++;
-                    }
-                }
-                static_assert(global_idx == nBytesOnRam, "Error in reading data, nBytesOnRam != global_idx");
-                delete[] temporary_buffer;
-            }
-
-        }
-        template <typename DTYPE> 
-        void writeNBytes(std::shared_ptr<DTYPE> ptr, std::size_t nBytes);
 
         template <typename DTYPE>
         void copy_data(std::size_t start_sample, std::size_t nsamples, DTYPE *data);
@@ -149,8 +123,8 @@ namespace IO
         int read_int();
         double read_double();
         std::string read_string();
-        std::size_t read_num_bytes(std::size_t nbytes, char *bytes);
-        std::size_t read_num_bytes_to_read();
+        std::size_t read_num_bytes(std::size_t nBytes, char *bytes);
+        std::size_t read_num_bytesToRead();
     };
 
 
