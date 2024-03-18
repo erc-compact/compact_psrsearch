@@ -1,9 +1,11 @@
-#include "gen_utils.hpp"
+#include "utils/gen_utils.hpp"
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <sys/stat.h>
 #include <system_error>
+#include <cerrno>
+#include <cassert>
 
 int fileOpen(FILE **file, const std::string absolutename, const std::string mode) {
     *file = fopen(absolutename.c_str(), mode.c_str());
@@ -67,5 +69,7 @@ std::string getExtension(const std::string& filename) {
     else
         return "";
 }
+
+
 
 

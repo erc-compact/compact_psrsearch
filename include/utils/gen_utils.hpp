@@ -5,6 +5,7 @@
 #include <iostream>
 #include <new>
 #include <algorithm>
+#include "exceptions.hpp"
 
 template <typename T>
 inline T *safeNew1D(unsigned long N, std::string error_position)
@@ -78,8 +79,22 @@ inline void clone_and_cast(K *src, V *dest, int n)
         dest[i] = (V)src[i];
 }
 
+
+template <typename T>
+void readFromFileAndVerify(FILE *file, std::size_t count, T *buffer) {
+    std::size_t countRead = fread(buffer, sizeof(T), count, file);
+    if (countRead != count) throw FileIOError(count, countRead, "read");
+}
+
+template <typename T>
+void writeToFileAndVerify(FILE *file, std::size_t count, T *buffer) {
+    std::size_t countRead = fwrite(buffer, sizeof(T), count, file);
+    if (countRead != count) throw FileIOError(count, countRead, "write");
+}
+
+
 int fileOpen(FILE **file, const std::string absolutename, const std::string mode);
 bool flleExists(const std::string name);
 int checkSize(unsigned long req, unsigned long got);
-std::string removeWhiteSpace(const std::string& str);
 bool caseInsensitiveCompare(const std::string& s1, const std::string& s2);
+std::string removeWhiteSpace(const std::string& str);
