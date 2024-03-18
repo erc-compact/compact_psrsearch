@@ -16,7 +16,7 @@ TCLAP_HOME = /homes/vkrishnan/dev/
 CC = nvcc
 
 # Compiler flags
-CXXFLAGS = -Wall -Wextra -O2 -I $(PHOME)/include/ -lpermissive -I $(TCLAP_HOME) -I $(CUDA_HOME)/include -I $(DEDISP_HOME)/include/
+CXXFLAGS = -Wall --std c++17 -Wextra -O2 -I $(PHOME)/include/ -lpermissive -I $(TCLAP_HOME) -I $(CUDA_HOME)/include -I $(DEDISP_HOME)/include/
 
 # Source files
 SRCS := $(wildcard src/*.cpp) $(wildcard src/**/*.cpp)
