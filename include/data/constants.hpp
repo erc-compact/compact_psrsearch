@@ -1,46 +1,47 @@
 #pragma once
+#include <string>
 #define READ "rb"
 #define WRITE "wb"
 #define VIRTUALFIL ""
 #define BITS_PER_BYTE 8
 
-const char* const HEADER_START = "HEADER_START";
-const char* const HEADER_END = "HEADER_END";
-const char* const NCHANS = "nChans";
-const char* const NBITS = "nBits";
-const char* const NIFS = "nifs";
-const char* const TSAMP = "tsamp";
-const char* const TSTART = "tstart";
-const char* const SRC_RAJ = "src_raj";
-const char* const SRC_DEJ = "src_dej";
-const char* const SOURCE_NAME = "source_name";
-const char* const MACHINE_ID = "machine_id";
-const char* const TELESCOPE_ID = "telescope_id";
-const char* const BARYCENTRIC= "barycentric";
-const char* const REFDM = "refdm";
+const std::string HEADER_START = "HEADER_START";
+const std::string HEADER_END = "HEADER_END";
+const std::string NCHANS = "nChans";
+const std::string NBITS = "nBits";
+const std::string NIFS = "nifs";
+const std::string TSAMP = "tsamp";
+const std::string TSTART = "tstart";
+const std::string SRC_RAJ = "src_raj";
+const std::string SRC_DEJ = "src_dej";
+const std::string SOURCE_NAME = "source_name";
+const std::string MACHINE_ID = "machine_id";
+const std::string TELESCOPE_ID = "telescope_id";
+const std::string BARYCENTRIC= "barycentric";
+const std::string REFDM = "refdm";
 
 
-const char* const NSAMPLES = "nsamples";
-const char* const NSAMPS = "nsamples";
-const char* const TOBS = "tobs";
-const char* const FCH1 = "fch1";
-const char* const FOFF = "foff";
-const char* const CHANNELBW = "foff";
+const std::string NSAMPLES = "nsamples";
+const std::string NSAMPS = "nsamples";
+const std::string TOBS = "tobs";
+const std::string FCH1 = "fch1";
+const std::string FOFF = "foff";
+const std::string CHANNELBW = "foff";
 
 
-const char* const HEADER_KEYS_FILE ="resources/header_keys.dat";
-const char* const INT = "int";
-const char* const DOUBLE = "double";
-const char* const STRING = "string";
-const char* const LONG = "long";
-const char* const NULL_STR = "null";
+const std::string HEADER_KEYS_FILE ="resources/header_keys.dat";
+const std::string INT = "int";
+const std::string DOUBLE = "double";
+const std::string STRING = "string";
+const std::string LONG = "long";
+const std::string NULL_STR = "null";
 
 
-const char* const BYTES = "bytes";
-const char* const SAMPLES = "samples";
-const char* const SECONDS = "seconds";
+const std::string BYTES = "bytes";
+const std::string SAMPLES = "samples";
+const std::string SECONDS = "seconds";
 
-
+typedef unsigned char BYTE;
 typedef unsigned char SIGPROC_FILTERBANK_8_BIT_TYPE;
 typedef unsigned short SIGPROC_FILTERBANK_16_BIT_TYPE;
 typedef float SIGPROC_FILTERBANK_32_BIT_TYPE;
