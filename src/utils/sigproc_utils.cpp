@@ -4,6 +4,17 @@
 #include <sstream>
 #include <vector>
 
+std::byte extractBitsFromByte(std::byte byte, std::byte b1, std::byte b2)
+{
+    // Create a mask with ones in the positions from b1 to b2
+    std::byte mask = ((1 << (b2 - b1 + 1)) - 1) << b1;
+
+    // Apply the mask to the byte and shift the result to the rightmost position
+    std::byte result = (byte & mask) >> b1;
+
+    return result;
+}
+
 /**
  * Parses an angle string and extracts the values for first, second, and third.
  *
