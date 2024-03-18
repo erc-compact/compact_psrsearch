@@ -47,6 +47,19 @@ class HeaderParamNotFound : public CustomException
 
 };
 
+class FileIOError : public CustomException
+{
+  public:
+    FileIOError(std::size_t required, std::size_t got, std::string operation) 
+    {
+        std::stringstream message;
+        message << "Error in file I/O. Could not " << operation << " " << required << " bytes. Got only " << got << " bytes.";
+        this->message = message.str();
+    }
+};
+
+
+
 
 /**
  * The following class is heavily borrowed from Peasoup. Credits to the original writers. 
