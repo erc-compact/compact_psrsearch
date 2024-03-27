@@ -1,4 +1,4 @@
-#include "data/sigproc_file.hpp"
+#include "data/sigproc_filterbank.hpp"
 #include "utils/sigproc_utils.hpp"
 #include "data/search_mode_file.hpp"
 #include "data/constants.hpp"
@@ -8,15 +8,17 @@
 #include <cstring>
 
 /**
- * @brief Constructs a SigprocFile object.
+ * @brief Constructs a SigprocFilterbank object.
  *
  * @param file_name The name of the file.
  * @param mode The mode in which the file should be opened.
  */
-IO::SigprocFile::SigprocFile(std::string file_name, std::string mode)
+IO::SigprocFilterbank::SigprocFilterbank(std::string file_name, std::string mode): SearchModeFile(file_name, mode)
 {
 
     readHeaderKeys();
+    this->headerFileOpenMode = mode;
+    this->dataFileOpenMode = mode;    
 
     if (mode == READ)
     {
@@ -37,7 +39,7 @@ IO::SigprocFile::SigprocFile(std::string file_name, std::string mode)
  *
  * @return int Returns 0 if the header keys are successfully read, otherwise returns an error code.
  */
-void IO::SigprocFile::readHeaderKeys()
+void IO::SigprocFilterbank::readHeaderKeys()
 {
     std::ifstream headerKeysFile(HEADER_KEYS_FILE);
     std::string line;
@@ -72,44 +74,11 @@ void IO::SigprocFile::readHeaderKeys()
 
 }
 
-/**
- * Opens the header file, if different from the data file.
- */
-void IO::SigprocFile::openHeaderFile()
-{
-    if (this->headerFileOpen || !this->isHeaderSeparate())
-        return;
 
-    fileOpen(&headerFile, this->headerFileName, this->mode);
-    this->headerFileOpen = true;
-}
 
-/**
- * Closes the header file associated with the SigprocFile object.
- */
-void IO::SigprocFile::closeHeaderFile()
-{
-    fclose(headerFile);
-    this->headerFileOpen = false;
-}
 
-void IO::SigprocFile::openDataFile()
-{
 
-    if (this->dataFileOpen)
-        return;
-
-    fileOpen(&dataFile, this->dataFileName, this->mode);
-    this->dataFileOpen = true;
-}
-
-void IO::SigprocFile::closeDataFile()
-{
-    fclose(dataFile);
-    this->dataFileOpen = false;
-}
-
-bool IO::SigprocFile::isHeaderSeparate()
+bool IO::SigprocFilterbank::isHeaderSeparate()
 {
     return false;
 }
@@ -121,7 +90,7 @@ bool IO::SigprocFile::isHeaderSeparate()
  *
  * @return The number of bytes in the header.
  */
-void IO::SigprocFile::readHeader()
+void IO::SigprocFilterbank::readHeader()
 {
 
     openHeaderFile();
@@ -138,7 +107,7 @@ void IO::SigprocFile::readHeader()
         if (read_num_bytes(num_bytes, &header_key_bytes[0]))
         {
 
-            if (!std::strcmp(header_key_bytes, HEADER_START))
+            if (!std::strcmp(header_key_bytes, HEADER_START.c_str()))
             {
                 HeaderParamBase *header_param = getHeaderParam(header_key_bytes);
                 static_cast<HeaderParam<char *> *>(header_param)->value = dummy;
@@ -147,7 +116,7 @@ void IO::SigprocFile::readHeader()
             }
             if (header_started)
             {
-                if (!std::strcmp(header_key_bytes, HEADER_END))
+                if (!std::strcmp(header_key_bytes, HEADER_END.c_str()))
                 {
                     HeaderParamBase *header_param = getHeaderParam(header_key_bytes);
                     static_cast<HeaderParam<char *> *>(header_param)->value = dummy;
@@ -222,12 +191,12 @@ void IO::SigprocFile::readHeader()
         }
     }
 
-    this->header_size = headerBytes;
+    this->headerBytes = headerBytes;
 }
 
-void IO::SigprocFile::writeHeader()
+void IO::SigprocFilterbank::writeHeader()
 {
-    if (mode != std::string((char *)WRITE) && mode != std::string((char *)VIRTUALFIL))
+    if (this->headerFileOpenMode != std::string((char *)WRITE) && this->headerFileOpenMode != std::string((char *)VIRTUALFIL))
     {
         std::cerr << " File not opened in write mode aborting now. " << std::endl;
     }
@@ -275,12 +244,12 @@ void IO::SigprocFile::writeHeader()
     fwrite(HEADER_END.c_str(), sizeof(char), headerEndLength, headerFile);
 }
 
-void IO::SigprocFile::readAllData()
+void IO::SigprocFilterbank::readAllData()
 {
     readNBytes(0, this->nBytesOnDisk);
 }
 
-void IO::SigprocFile::readNBytes(std::size_t startByte, std::size_t nBytes) {
+void IO::SigprocFilterbank::readNBytes(std::size_t startByte, std::size_t nBytes) {
     this->nBytesOnDisk = nBytes;
     this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
     switch (this->nBits)
@@ -301,134 +270,15 @@ void IO::SigprocFile::readNBytes(std::size_t startByte, std::size_t nBytes) {
 
 }
 
-void IO::SigprocFile::writeNBytes(std::size_t startByte, std::size_t nBytes) {
-            this->nBytesOnDisk = nBytes;
-            this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
-            switch (this->nBits)
-            {
-            case 1:
-            case 2:
-            case 4:
-            case 8:
-                this->writeNBytesOfType<SIGPROC_FILTERBANK_8_BIT_TYPE>(startByte, nBytes);
-                break;
-            case 16:
-                this->writeNBytesOfType<SIGPROC_FILTERBANK_16_BIT_TYPE>(startByte, nBytes);
-                break;
-            case 32:
-                this->writeNBytesOfType<SIGPROC_FILTERBANK_32_BIT_TYPE>(startByte, nBytes);
-                break;
-            }
-    
-        }
+void IO::SigprocFilterbank::writeAllData() {}
 
-
-
-
-void IO::SigprocFile::writeAllData()
+void IO::SigprocFilterbank::rewind_to_data_start()
 {
-
-    fwrite(data, sizeof(unsigned char), data_bytes, dataFile);
+    fseek(this->dataFile, this->headerBytes, SEEK_SET);
 }
 
-void IO::SigprocFile::writeNBytes(std::size_t start_byte, std::size_t nbytes)
-{
-    if (this->data_buffer->buffer == NULL)
-        throw InvalidBufferStateException("Buffer is not allocated, cannot write data");
 
-    // go to start byte
-    fseek(dataFile, start_byte, SEEK_SET);
-
-    double nBits = this->nBits;
-
-    if (nBits == 8)
-    { // easy, just write the whole thing from buffer directly
-        std::size_t count = fwrite(this->data_buffer->buffer, sizeof(DTYPE), nbytes, this->dataFile);
-        static_assert(count == nbytes, "Error in writing data, nbytes != count");
-        return;
-    }
-
-    std::size_t ngulps = this->gulpSize > 0 ? nbytes / this->gulpSize : nbytes;
-    std::size_t total_bytes_written = 0;
-    std::size_t global_idx = 0;
-
-    while (total_bytes_written < nbytes)
-    {
-        std::size_t bytes_to_write = std::min(this->gulpSize, nbytes - total_bytes_written);
-
-        if (bytes_to_write % nBits != 0)
-        {
-            bytes_to_write = (bytes_to_write / nBits - 1) * nBits; // to get around edge cases and non multiples, which should never occur
-        }
-
-        DTYPE *temporary_buffer = safeNew1D<DTYPE>(bytes_to_write, __func__);
-
-        if (nBits < 8)
-        {
-            for (int byte = 0; byte < bytes_to_write; byte++) // iterate over each byte
-            {
-                unsigned char byte_value = 0;
-
-                for (int bit_group = 0; bit_group < 8 / nBits; bit_group++) // iterate over each bit group
-                {
-                    byte_value |= (this->data_buffer->buffer[global_idx] << (bit_group * nBits));
-                    global_idx++;
-                }
-
-                temporary_buffer[byte] = byte_value;
-            }
-        }
-        else
-        {
-            int num_bytes_per_value = nBits / 8;
-
-            while (global_idx < bytes_to_write)
-            {
-                for (int k = 0; k < num_bytes_per_value; k++)
-                {
-                    temporary_buffer[global_idx + k] = this->data_buffer->buffer[global_idx] / pow(2, 8 * (num_bytes_per_value - k));
-                }
-                global_idx++;
-            }
-
-            total_bytes_written += bytes_to_write;
-        }
-
-        std::size_t count = fwrite(temporary_buffer, sizeof(DTYPE), bytes_to_write, this->dataFile);
-        static_assert(count == bytes_to_write, "Error in writing data, nbytes != bytes_to_write");
-
-        delete[] temporary_buffer;
-    }
-}
-
-void IO::SigprocFile::copy_data(std::size_t start_sample, std::size_t nsamples, DTYPE *data)
-{
-
-    int nChans = getValueForKey<int>(NCHANS);
-    int nifs = getValueForKey<int>(NIFS);
-
-    unsigned long bytes_to_copy = samplesToBytes(nsamples);
-    unsigned long byte_to_start = samplesToBytes(start_sample) + this->headerBytes;
-
-    std::memcpy(&this->data[data_bytes], &data[byte_to_start], sizeof(DTYPE) * bytes_to_copy);
-    data_bytes += bytes_to_copy;
-}
-
-void IO::SigprocFile::writeAllData()
-{
-    writeNBytes(0, this->nBytesOnRam);
-}
-
-int IO::SigprocFile::rewind_to_data_start()
-{
-    fseek(this->dataFile, this->header_size, SEEK_SET);
-}
-void IO::SigprocFile::rewind_to_file_start()
-{
-    rewind(this->dataFile);
-}
-
-int IO::SigprocFile::read_int()
+int IO::SigprocFilterbank::read_int()
 {
     int result;
     std::size_t count = fread(&result, sizeof(result), 1, dataFile);
@@ -438,7 +288,7 @@ int IO::SigprocFile::read_int()
         return EXIT_FAILURE;
 }
 
-double IO::SigprocFile::read_double()
+double IO::SigprocFilterbank::read_double()
 {
     double result;
     std::size_t count = fread(&result, sizeof(result), 1, dataFile);
@@ -446,21 +296,4 @@ double IO::SigprocFile::read_double()
         return result;
     else
         return EXIT_FAILURE;
-}
-}
-std::size_t IO::SigprocFile::read_num_bytes_to_read()
-{
-    int nbytes = 4;
-    unsigned char bytes[nbytes];
-    std::size_t count = fread(&bytes, nbytes, 1, dataFile);
-    if (count)
-        return (bytes[0] + bytes[1] * 256 + bytes[2] * 65536 + bytes[3] * 16777216);
-    else
-        return EXIT_FAILURE;
-}
-int IO::SigprocFile::read_num_bytes(int nbytes, char* bytes){
-	size_t count = fread(bytes,nbytes,1,file);
-	bytes[nbytes] = '\0';
-	return count;
-
 }
