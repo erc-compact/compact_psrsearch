@@ -10,6 +10,7 @@
 #include "exceptions.hpp"
 #include "data/search_mode_file.hpp"
 #include "applications/common_arguments.hpp"
+#include <typeinfo>
 
 /**
  * @class DedisperseCommandArgs
@@ -58,7 +59,7 @@ class DedisperseCommandArgs: public APP::DataFileReadArgs, public APP::FileWrite
                                 numGpus(1),
                                 ramLimitGB(0)
         {
-            ArgsBase::registerParser(std::bind(&DedisperseCommandArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), std::bind(&DedisperseCommandArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
             ArgsBase::cmd.add(argDmStart);
             ArgsBase::cmd.add(argDmEnd);
             ArgsBase::cmd.add(argDmTol);
