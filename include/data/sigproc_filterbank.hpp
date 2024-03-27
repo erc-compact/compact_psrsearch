@@ -3,6 +3,8 @@
 #include "data/search_mode_file.hpp"
 #include "data/header_params.hpp"
 #include "data/data_buffer.hpp"
+#include "exceptions.hpp"
+#include "utils/sigproc_utils.hpp"
 #include <string>
 #include <vector>
 #include <memory>
@@ -19,13 +21,8 @@ namespace IO
     public:
         bool verbose;
         std::size_t header_size;
+
         void readHeaderKeys();
-
-        void closeHeaderFile();
-
-        void openDataFile();
-        void closeDataFile();
-
         bool isHeaderSeparate();
 
         void readHeader();
@@ -35,7 +32,7 @@ namespace IO
         void writeAllData();
 
         void readNBytes(std::size_t startByte, std::size_t nBytes); 
-        void writeNBytes(std::size_t startByte, std::size_t nBytes);
+        void writeNBytes();
 
         template<typename DTYPE, typename = std::enable_if_t<std::is_arithmetic<DTYPE>::value>>
         void readNBytesOfType(std::size_t startByte, std::size_t nBytes){
@@ -84,33 +81,14 @@ namespace IO
             size_t inBufferSize = this->container->getNElements();
             /* At this point all necessary conversions have been done to data >=8 bits, directly write the results to a file*/
             if(nBits>=8){
-                writeToFileAndVerify<DTYPE>(this->dataFile, inBufferSize, inBuffer.get());
+                writeToFileAndVerify<DTYPE>(this->dataFile, inBufferSize, inBuffer->data());
                 return;
             }
-
-            /*compute minimum and maximum for current datatype and datatype to write to */
-            int inTypeMin = std::numeric_limits<DTYPE>::min();  
-            int inTypeMax = std::numeric_limits<DTYPE>::max();
-            int inRange = inTypeMax - inTypeMin;
-            int outTypeMin = 0;
-            int outTypeMax = std::pow(2, nBits) - 1;
-            int outRange = outTypeMax - outTypeMin;
-
-            
-            std::unique_ptr<std::vector<uint8_t>> outBuffer = std::make_unique<std::vector<uint8_t>>(this->nBytesOnDisk);
-            std::size_t outIdx = 0;
-
-            for(std::size_t inIdx = 0; inIdx < inBufferSize; ++inIdx) {
-                outIdx = static_cast<int>(inIdx * nBits / BITS_PER_BYTE);
-                DTYPE inBufferVal = inBuffer->at(inIdx);
-              
-                if (inBufferVal > outTypeMax) inBufferVal = inBufferVal > outTypeMax ? 
-                                                                outTypeMax : 
-                                                                outTypeMin + (inBufferVal - inTypeMin)/ inRange * outRange; 
-                outBuffer->at(outIdx) |= inBufferVal << (inIdx * nBits % BITS_PER_BYTE);
-
+            else{
+                //throw not implemented error
+                throw FunctionalityNotImplemented("Write < 8 bit data");
             }
-                
+
             
         }
 
@@ -129,16 +107,13 @@ namespace IO
             
             
         // }
-        uint8_t extractBitsFromByte(uint8_t byte, uint8_t b1, uint8_t b2);
 
         void rewind_to_data_start();
 
         // void plot_data(std::size_t start_sample, std::size_t num_samples, bool fscrunch);
-        int read_int();
-        double read_double();
-        std::string read_string();
-        std::size_t read_num_bytes(std::size_t nBytes, char *bytes);
-        std::size_t read_num_bytesToRead();
+        int readInt();
+        double readDouble();
+        std::size_t readNumBytesFromHeader(int nbytes, char* bytes);
     };
 
 

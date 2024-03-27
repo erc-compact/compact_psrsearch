@@ -101,10 +101,10 @@ void IO::SigprocFilterbank::readHeader()
     while (1)
     {
         iter++;
-        int num_bytes = read_int();
+        int num_bytes = readInt();
         char header_key_bytes[num_bytes + 1];
         char dummy[] = "NULL";
-        if (read_num_bytes(num_bytes, &header_key_bytes[0]))
+        if (readNumBytesFromHeader(num_bytes, &header_key_bytes[0]))
         {
 
             if (!std::strcmp(header_key_bytes, HEADER_START.c_str()))
@@ -157,29 +157,29 @@ void IO::SigprocFilterbank::readHeader()
                     header_param->inheader = true;
                     if (dtype == std::string(INT))
                     {
-                        static_cast<HeaderParam<int> *>(header_param)->value = read_int();
+                        static_cast<HeaderParam<int> *>(header_param)->value = readInt();
                     }
                     else if (dtype == std::string(DOUBLE))
                     {
-                        static_cast<HeaderParam<double> *>(header_param)->value = read_double();
+                        static_cast<HeaderParam<double> *>(header_param)->value = readDouble();
                     }
                     else if (dtype == std::string(STRING))
                     {
-                        num_bytes = read_int();
+                        num_bytes = readInt();
                         if (num_bytes == 0)
                         {
                             static_cast<HeaderParam<char *> *>(header_param)->value = dummy;
                             continue;
                         }
                         char *header_value_bytes = new char[num_bytes + 1];
-                        if (read_num_bytes(num_bytes, header_value_bytes))
+                        if (readNumBytesFromHeader(num_bytes, header_value_bytes))
                         {
                             static_cast<HeaderParam<char *> *>(header_param)->value = header_value_bytes;
                         }
                     }
                     else if (dtype == std::string(NULL_STR))
                     {
-                        num_bytes = read_int();
+                        num_bytes = readInt();
                         if (num_bytes == 0)
                         {
                             static_cast<HeaderParam<char *> *>(header_param)->value = dummy;
@@ -270,6 +270,25 @@ void IO::SigprocFilterbank::readNBytes(std::size_t startByte, std::size_t nBytes
 
 }
 
+
+void IO::SigprocFilterbank::writeNBytes() {
+    switch (this->nBits)
+    {
+    case 1:
+    case 2:
+    case 4:
+    case 8:
+        this->writeNBytesOfType<SIGPROC_FILTERBANK_8_BIT_TYPE>();
+        break;
+    case 16:
+        this->writeNBytesOfType<SIGPROC_FILTERBANK_16_BIT_TYPE>();
+        break;
+    case 32:
+        this->writeNBytesOfType<SIGPROC_FILTERBANK_32_BIT_TYPE>();
+        break;
+    }
+}
+
 void IO::SigprocFilterbank::writeAllData() {}
 
 void IO::SigprocFilterbank::rewind_to_data_start()
@@ -278,22 +297,30 @@ void IO::SigprocFilterbank::rewind_to_data_start()
 }
 
 
-int IO::SigprocFilterbank::read_int()
+int IO::SigprocFilterbank::readInt()
 {
     int result;
-    std::size_t count = fread(&result, sizeof(result), 1, dataFile);
+    std::size_t count = fread(&result, sizeof(result), 1, headerFile);
     if (count)
         return result;
     else
         return EXIT_FAILURE;
 }
 
-double IO::SigprocFilterbank::read_double()
+double IO::SigprocFilterbank::readDouble()
 {
     double result;
-    std::size_t count = fread(&result, sizeof(result), 1, dataFile);
+    std::size_t count = fread(&result, sizeof(result), 1, headerFile);
     if (count)
         return result;
     else
         return EXIT_FAILURE;
+}
+
+
+std::size_t IO::SigprocFilterbank::readNumBytesFromHeader(int nbytes, char* bytes){
+	std::size_t count = fread(bytes,nbytes,1, headerFile);
+	bytes[nbytes] = '\0';
+	return count;
+
 }
