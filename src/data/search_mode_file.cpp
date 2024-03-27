@@ -1,20 +1,39 @@
 #include "data/search_mode_file.hpp"
 #include "data/header_params.hpp"
 #include "data/constants.hpp"
-#include "data/sigproc_file.hpp"
+#include "data/sigproc_filterbank.hpp"
+#include "data/presto_timeseries.hpp"
 #include "utils/gen_utils.hpp"
 #include "utils/sigproc_utils.hpp"
 #include "exceptions.hpp"
 #include <string>
 #include <cstring>
 #include <cmath>
+#include <memory>
 
 using namespace IO;
 
+SearchModeFile::SearchModeFile(std::string fileName, std::string mode) {
 
-SearchModeFile* SearchModeFile::createInstance(std::string fileName, std::string mode, std::string fileType){
+    this->dataFileName = fileName;
+    this->dataFileOpenMode = mode;
+    
+    this->headerFileOpen = false;
+    this->dataFileOpen = false;
+    this->headerBytes = 0;
+    this->dataBytes = 0;
 
-            SearchModeFile *searchFileObj;
+    this->headerFile = nullptr;
+    this->dataFile = nullptr;
+
+    this->nBytesOnDisk = 0;
+    this->nBytesOnRam = 0;
+
+    this->container = nullptr;
+}
+
+std::shared_ptr<SearchModeFile> SearchModeFile::createInstance(std::string fileName, std::string mode, std::string fileType){
+
 
             if(fileType.empty()){
                 fileType = guessFileType(fileName);
@@ -23,15 +42,15 @@ SearchModeFile* SearchModeFile::createInstance(std::string fileName, std::string
             if (caseInsensitiveCompare(fileType, "filterbank") || 
                 caseInsensitiveCompare(fileType, "sigproc_filterbank") || 
                 caseInsensitiveCompare(fileType, "fil")){
-                    searchFileObj = new SigprocFile(fileName, mode);
+                    return std::make_shared<SigprocFilterbank>(fileName, mode);
             }
             else if (caseInsensitiveCompare(fileType, "presto_timeseries") || 
                      caseInsensitiveCompare(fileType, "presto")){
-                searchFileObj = new PrestoTimeSeries(fileName, mode);
+                    return std::make_shared<PrestoTimeSeries>(fileName, mode);
             }
             else if (caseInsensitiveCompare(fileType, "tim") || 
                      caseInsensitiveCompare(fileType, "sigproc_timeseries")){
-                searchFileObj = new SigprocTimeSeries(fileName, mode);
+                    return std::make_shared<SigprocTimeSeries>(fileName, mode);
             }
             else{
                 throw FileFormatNotRecognised(fileType);
@@ -62,14 +81,14 @@ std::string SearchModeFile::guessFileType(std::string fileName){
  * @param key The key of the header parameter to retrieve.
  * @return A pointer to the header parameter if found, otherwise NULL.
  */
-HeaderParamBase* SearchModeFile::getHeaderParam(std::string key) {
+HeaderParamBase* SearchModeFile::getHeaderParam(const std::string key) {
 
     std::map<std::string, HeaderParamBase *>::iterator it = headerParams.find(key);
     if (it != headerParams.end()) return it->second;
     return nullptr;
 }
 
-void SearchModeFile::removeHeaderParam(std::string key) {
+void SearchModeFile::removeHeaderParam(const std::string key) {
    
     std::map<std::string, HeaderParamBase *>::iterator it = headerParams.find(key);
     if (it != headerParams.end()) headerParams.erase(it);
@@ -174,30 +193,30 @@ std::size_t SearchModeFile::getTotalDataSize() {
     return this->nBytesOnDisk;
 }
 
-double SearchModeFile::getMean() {
-    std::size_t nSamps = getValueForKey<long>(NSAMPS);
-    double mean = 0.0;
-    for (std::size_t i = 0; i < nSamps; ++i)
-    {
-        mean += (*this->container)[i];
-    }
-    return mean / nSamps;
-}
+// double SearchModeFile::getMean() {
+//     std::size_t nSamps = getValueForKey<long>(NSAMPS);
+//     double mean = 0.0;
+//     for (std::size_t i = 0; i < nSamps; ++i)
+//     {
+//         mean += this->container->at(i);
+//     }
+//     return mean / nSamps;
+// }
 
-double SearchModeFile::getRMS() {
-    long nSamps = getValueForKey<long>(NSAMPS);
-    double sumsq = 0.0;
-    double sum = 0.0;
-    for (std::size_t i = 0; i < nSamps; ++i)
-    {   
-        float data = (*this->container)[i];
-        sumsq += (data * data);
-        sum += data;
-    }
-    double mean = sum / nSamps;
-    double rms = std::sqrt(sumsq / nSamps - mean * mean);
-    return rms;
-}
+// double SearchModeFile::getRMS() {
+//     long nSamps = getValueForKey<long>(NSAMPS);
+//     double sumsq = 0.0;
+//     double sum = 0.0;
+//     for (std::size_t i = 0; i < nSamps; ++i)
+//     {   
+//         float data = (*this->container)[i];
+//         sumsq += (data * data);
+//         sum += data;
+//     }
+//     double mean = sum / nSamps;
+//     double rms = std::sqrt(sumsq / nSamps - mean * mean);
+//     return rms;
+// }
 
 
 void SearchModeFile::skipSamples(std::size_t nsamples) {
@@ -238,6 +257,44 @@ void SearchModeFile::goToByte(std::size_t byte) {
 }
 
 
-void SearchModeFile::nSamplesInBuffer() {
-    return this->container->nBytes / this->nChans / this->nBits / BITS_PER_BYTE;
+std::size_t SearchModeFile::nSamplesInBuffer() {
+    return this->container->getNBytes() / this->nChans / this->nBits / BITS_PER_BYTE;
+}
+
+void IO::SearchModeFile::openHeaderFile()
+{
+    if (this->headerFileOpen || !this->isHeaderSeparate())
+        return;
+
+    fileOpen(&headerFile, this->headerFileName, this->headerFileOpenMode);
+    this->headerFileOpen = true;
+}
+
+void IO::SearchModeFile::closeHeaderFile()
+{
+    if (!this->headerFileOpen || !this->isHeaderSeparate())
+        return;
+    fclose(headerFile);
+    this->headerFileOpen = false;
+}
+
+void IO::SearchModeFile::openDataFile()
+{
+
+    if (this->dataFileOpen)
+        return;
+
+    fileOpen(&dataFile, this->dataFileName, this->dataFileOpenMode);
+    this->dataFileOpen = true;
+}
+
+void IO::SearchModeFile::closeDataFile()
+{
+    fclose(dataFile);
+    this->dataFileOpen = false;
+}
+
+void IO::SearchModeFile::clearBuffer()
+{
+    this->container->clearBuffer();
 }

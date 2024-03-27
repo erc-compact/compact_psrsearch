@@ -34,17 +34,20 @@ namespace IO
     {
 
         public:
-            static SearchModeFile* createInstance(std::string file_name, std::string mode, std::string file_type);
+            static std::shared_ptr<SearchModeFile> createInstance(std::string fileName, std::string mode, std::string fileType);
             static inline std::string guessFileType(std::string file_name); 
 
 
         public:
+
+            SearchModeFile(std::string fileName, std::string mode);
 
             std::string headerFileName;
             bool headerFileOpen = false;
             FILE *headerFile;
             std::size_t headerBytes;
             std::map<std::string, HeaderParamBase *> headerParams;         //map of header params
+            std::string headerFileOpenMode;
 
             struct stat headerFileStat;
             struct stat dataFileStat;
@@ -55,6 +58,7 @@ namespace IO
             bool dataFileOpen = false;
             FILE *dataFile;
             std::size_t dataBytes;
+            std::string dataFileOpenMode;
 
 
             std::size_t nSamps;
@@ -73,18 +77,18 @@ namespace IO
             
             void printHeader();
             void prettyPrintHeader();
-            HeaderParamBase *getHeaderParam(std::string key);
-            void removeHeaderParam(std::string key);
+            HeaderParamBase *getHeaderParam(const std::string key);
+            void removeHeaderParam(const std::string key);
 
             /**
              * Virtual functions to be implemented by the child classes
              */
 
-            virtual void openHeaderFile() = 0;
-            virtual void closeHeaderFile() = 0;
+            void openHeaderFile();
+            void closeHeaderFile();
 
-            virtual void openDataFile() = 0;
-            virtual void closeDataFile() = 0;
+            void openDataFile();
+            void closeDataFile();
 
             virtual bool isHeaderSeparate() = 0;
 
@@ -108,6 +112,8 @@ namespace IO
             void gotoTimestamp(double timeStampSecs);
             void goToByte(std::size_t byte);
 
+            void clearBuffer();
+
 
             std::size_t samplesToBytes(std::size_t nSamples);
             std::size_t bytesToSamples(std::size_t nSamples);
@@ -120,10 +126,9 @@ namespace IO
 
 
 
-            inline SearchModeFile(){}
 
             template <typename T>
-            void addToHeader(const char *key, std::string dtype, T value) {
+            void addToHeader(const std::string key, const std::string dtype, T value) {
                 HeaderParamBase *base = getHeaderParam(key);
                 if (base != NULL) {
                     static_cast<HeaderParam<T> *>(base)->value = value;
@@ -135,34 +140,34 @@ namespace IO
             }
             
             template <typename T>
-            T getValueForKey(const char *key) {
+            T getValueForKey(const std::string key) {
                 HeaderParamBase *base = getHeaderParam(key);
                 return static_cast<HeaderParam<T> *>(base)->value;
             }
             template <typename T>
-            T getValueOrDefaultForKey(const char *key, T default_value) {
+            T getValueOrDefaultForKey(const std::string key, T default_value) {
                 HeaderParamBase *base = getHeaderParam(key);
                 if (base == NULL) return default_value;
                 return static_cast<HeaderParam<T> *>(base)->value;
             }
 
             template <typename T>
-            inline void setValueForKey(const char *key, T value){
+            inline void setValueForKey(const std::string key, T value){
                 HeaderParamBase *base = getHeaderParam(key);
                 if (base != NULL) static_cast<HeaderParam<T> *>(base)->value = value;
             }
 
-            template <typename DTYPE>
-            void copy_data(std::size_t start_sample, std::size_t nsamples, DTYPE *data){
-                int nChans = getValueForKey<int>(NCHANS);
-                int nifs = getValueForKey<int>(NIFS);
+            // template <typename DTYPE>
+            // void copy_data(std::size_t start_sample, std::size_t nsamples, DTYPE *data){
+            //     int nChans = getValueForKey<int>(NCHANS);
+            //     int nifs = getValueForKey<int>(NIFS);
 
-                unsigned long bytes_to_copy = samplesToBytes(nsamples);
-                unsigned long byte_to_start = samplesToBytes(start_sample) + this->headerBytes;
+            //     unsigned long bytes_to_copy = samplesToBytes(nsamples);
+            //     unsigned long byte_to_start = samplesToBytes(start_sample) + this->headerBytes;
 
-                std::memcpy(this->container->getBuffer(), &data[byte_to_start], sizeof(DTYPE) * bytes_to_copy);
-            }
-            void nSamplesInBuffer();         
+            //     std::memcpy(std::dynamic_pointer_cast<std::shared_ptr<DataBuffer>>(data)->getBuffer(), &data[byte_to_start], sizeof(DTYPE) * bytes_to_copy);
+            // }
+            std::size_t nSamplesInBuffer();         
 
 
             std::size_t getNSamps() const {
