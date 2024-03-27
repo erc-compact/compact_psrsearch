@@ -4,13 +4,13 @@
 #include <sstream>
 #include <vector>
 
-std::byte extractBitsFromByte(std::byte byte, std::byte b1, std::byte b2)
+uint8_t extractBitsFromByte(uint8_t byte, uint8_t b1, uint8_t b2)
 {
     // Create a mask with ones in the positions from b1 to b2
-    std::byte mask = ((1 << (b2 - b1 + 1)) - 1) << b1;
+    uint8_t mask = ((1 << (b2 - b1 + 1)) - 1) << b1;
 
     // Apply the mask to the byte and shift the result to the rightmost position
-    std::byte result = (byte & mask) >> b1;
+    uint8_t result = (byte & mask) >> b1;
 
     return result;
 }
@@ -218,3 +218,7 @@ int ddmmss_to_double(const std::string& ddmmss, double& degree_value)
 
     return 0;
 }
+
+
+
+

@@ -6,4 +6,4 @@ void ddmmss_to_sigproc(const std::string& ddmmss, double& sigproc);
 void hhmmss_to_sigproc(const std::string& hhmmss, double& sigproc);
 int hhmmss_to_double(const std::string& hhmmss, double& degree_value);
 int ddmmss_to_double(const std::string& ddmmss, double& degree_value);
-std::byte extractBitsFromByte(std::byte byte,std::byte b1, std::byte b2);
+uint8_t extractBitsFromByte(uint8_t byte,uint8_t b1, uint8_t b2);
