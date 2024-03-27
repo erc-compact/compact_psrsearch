@@ -1,12 +1,15 @@
-
+#pragma once
 #include <tclap/CmdLine.h>
 #include <string>
 #include <sstream>
 #include <iostream>
 #include "exceptions.hpp"
+#include "data/constants.hpp"
 #include <vector>
 #include <cstdarg>
 #include <functional>
+#include <map>
+#include <typeinfo>
 
 namespace APP {
 
@@ -30,17 +33,15 @@ namespace APP {
 
     protected:
     
-        static std::vector<std::function<void(int, char **)>> functionList; // list of functions in different classes that parse the whole commandline
-
+        static std::map<std::string, std::function<void(int, char **)>> functionMap; // map of functions in different classes that parse the whole commandline
         /**
          * @brief Registers a parser function to be called when parsing the command line.
          * @param f The parser function to register.
          */
-        static void registerParser(std::function<void(int, char **)> f) {
-            // add if function is not already in the list
-            if (std::find(functionList.begin(), functionList.end(), f) == functionList.end()) {
-                functionList.push_back(f);
-            }
+        static void registerParser(std::string name, std::function<void(int, char **)> f) {
+            // add function to map with class name as key
+            std::string className = name;
+            functionMap[className] = f;
         }
 
     public:
@@ -63,9 +64,13 @@ namespace APP {
          */
         static void parseAll(int argc, char **argv) {
             try {
-                for (auto &f : functionList) {
-                    f(argc, argv);
+                //iterate over all entries of function Map 
+                for (auto &f : functionMap) {
+                    f.second(argc, argv);
                 }
+                // for (auto &f : functionList) {
+                //     f(argc, argv);
+                // }
             } catch (TCLAP::ArgException &e) {
                 std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
                 throw e;
@@ -73,6 +78,20 @@ namespace APP {
                 std::cerr << "error: " << e.what() << std::endl;
                 throw e;
             }
+        }
+
+        /**
+         * @brief Checks if any argument in the given group is set.
+         * @param argGroup The group of arguments to check.
+         * @return True if any argument in the group is set, false otherwise.
+         */
+        bool isAnyArgSet(const std::vector<TCLAP::Arg *> &argGroup) {
+            for (const auto &arg : argGroup) {
+                if (arg->isSet()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
          /**
@@ -83,20 +102,23 @@ namespace APP {
         template <typename... Groups>
         void checkExclusivity(Groups... groups) {
             try {
+
+                //iterate over the groups and check if more than one is set, if so throw an exception
+                
+
                 std::vector<bool> groupStatuses = {isAnyArgSet(groups)...};
                 int trueCount = std::count(groupStatuses.begin(), groupStatuses.end(), true);
                 if (trueCount > 1) {
                     std::stringstream exception_msg;
                     exception_msg << "You can only use one of the following options: ";
-
-                    (auto &&... groups) {
-                        (([&exception_msg](const auto &group) {
-                            for (const auto &arg : group) {
-                                exception_msg << arg->getName() << ", ";
-                            }
-                        }(groups)),
-                         ...);
-                    }(groups...);
+                    int i = 0;
+                    for (auto &group : {groups...}) {
+                        if (groupStatuses[i]) {
+                            exception_msg << group[0]->getName() << ", ";
+                        }
+                        i++;
+                    }
+                    
                     exception_msg << "but you used more than one.";
                     throw CustomException(exception_msg.str());
                 }
@@ -108,6 +130,8 @@ namespace APP {
                 throw e;
             }
         }
+
+       
     };
 
     /**
@@ -126,7 +150,7 @@ namespace APP {
          */
         CommonArgs() : verboseLevel("WARN"),
                        progressBar(false) {
-            ArgsBase::registerParser(std::bind(&CommonArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), std::bind(&CommonArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
             ArgsBase::cmd.add(argVerbose);
             ArgsBase::cmd.add(argProgressBar);
         }
@@ -141,19 +165,7 @@ namespace APP {
             progressBar = argProgressBar.getValue();
         }
 
-        /**
-         * @brief Checks if any argument in the given group is set.
-         * @param argGroup The group of arguments to check.
-         * @return True if any argument in the group is set, false otherwise.
-         */
-        bool isAnyArgSet(const std::vector<TCLAP::Arg *> &argGroup) {
-            for (const auto &arg : argGroup) {
-                if (arg->isSet()) {
-                    return true;
-                }
-            }
-            return false;
-        }
+        
 
        
     };
@@ -211,7 +223,7 @@ namespace APP {
                              killFile(NULL_STR),
                              birdiesFile(NULL_STR) {
 
-            ArgsBase::registerParser(std::bind(&DataFileReadArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name() , std::bind(&DataFileReadArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
 
             ArgsBase::cmd.add(argStartByte);
             ArgsBase::cmd.add(argNBytes);
@@ -299,7 +311,7 @@ namespace APP {
                          outputFormat("presto_timeseries"),
                          outputPrefix(""),
                          outputSuffix("") {
-            ArgsBase::registerParser(std::bind(&FileWriteArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), std::bind(&FileWriteArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
             ArgsBase::cmd.add(argOutputDir);
             ArgsBase::cmd.add(argOutputFormat);
             ArgsBase::cmd.add(argOutputPrefix);
