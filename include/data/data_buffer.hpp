@@ -1,8 +1,12 @@
+#pragma once
 #include "utils/gen_utils.hpp"
 #include <memory>
 #include <cstring> 
+#include <vector>
 
 namespace IO {
+    class DataBufferBase;
+    template <class DTYPE> class DataBuffer;
 
     /**
      * @brief Base class for data buffers.
@@ -28,14 +32,22 @@ namespace IO {
         {
         }
 
+        // getters for startByte and nBytes
+        std::size_t getStartByte() { return startByte; }
+        std::size_t getNBytes() { return nBytes; }
+
+
+
         /**
-         * @brief Retrieves the buffer.
+         * @brief Retrieves the number of elements in the buffer.
          * 
-         * This method should be implemented by derived classes to provide access to the buffer.
+         * This method should be implemented by derived classes to provide the number of elements in the buffer.
          * 
-         * @return A pointer to the buffer.
+         * @return The number of elements in the buffer.
          */
-        virtual void* getBuffer() = 0;
+        virtual int getNElements() = 0;
+
+
 
         /**
          * @brief Destroys the DataBufferBase object.
@@ -43,14 +55,29 @@ namespace IO {
          * This is a virtual destructor to ensure proper destruction of derived classes.
          */
         virtual ~DataBufferBase() = default;
+
+        virtual void clearBuffer() = 0;
+
+        virtual double getDoubleValueAt(std::size_t idx) = 0;   
+
+
+        template <typename DTYPE>
+        std::shared_ptr<std::vector<DTYPE>> getBuffer() {
+            const DataBuffer<DTYPE>* derived = dynamic_cast<const DataBuffer<DTYPE>*>(this);
+            if (derived) {
+                return derived->getTypedBuffer();
+            } else {
+                throw std::bad_cast(); // or return nullptr, depending on how you want to handle the error
+            }
+        }
     };
 
     template <class DTYPE>
     class DataBuffer : public DataBufferBase
     {
         public:
-            std::shared_ptr<DTYPE> buffer = nullptr; /**< The buffer storing the data. */
-
+            std::shared_ptr<std::vector<DTYPE>> buffer = nullptr; /**< The buffer storing the data. */
+            std::size_t nElements; /**< The number of elements in the buffer. */
             /**
              * @brief Constructs a DataBuffer object.
              * 
@@ -60,7 +87,8 @@ namespace IO {
             DataBuffer(std::size_t startByte, std::size_t nBytes)
                 : DataBufferBase(startByte, nBytes)
             {
-                buffer = std::make_shared<DTYPE[]>(nBytes);
+                buffer = std::make_shared<std::vector<DTYPE>>(nBytes);
+                nElements = nBytes / sizeof(DTYPE);
             }
 
             /**
@@ -73,8 +101,8 @@ namespace IO {
              * 
              * @return A pointer to the buffer.
              */
-            void* getBuffer() override {
-                return static_cast<void*>(buffer.get());
+            std::shared_ptr<std::vector<DTYPE>> getTypedBuffer() const {
+                return buffer; 
             }
 
             /**
@@ -84,14 +112,38 @@ namespace IO {
              * @return A reference to the element at the specified index.
              */
             DTYPE& operator[](std::size_t idx) {
-                return buffer[idx];
+                return buffer.get()[idx];
             }
 
             /**
              * @brief Clears the buffer by setting all elements to zero.
              */
-            void clearBuffer() {
-                std::memset(buffer.get(), 0, nBytes);
+            void clearBuffer() override {
+                buffer->clear();
             }
+
+            /**
+             * @brief Retrieves the number of elements in the buffer.
+             * 
+             * @return The number of elements in the buffer.
+             */
+            int getNElements() {
+                return nElements;
+            }
+
+            /**
+             * @brief Retrieves the value at the specified index in the buffer.
+             * 
+             * @param idx The index of the value to retrieve.
+             * @return The value at the specified index.
+             */
+            double getDoubleValueAt(std::size_t idx) {
+                return static_cast<double>(buffer->at(idx));
+            }
+            
+            
+
+            
+            
     };
 };
