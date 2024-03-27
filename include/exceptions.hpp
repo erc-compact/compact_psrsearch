@@ -76,10 +76,10 @@ public:
     }
   }
   
-  static void checkFileError(std::ifstream& infile, std::string filename){
+  static void checkFileError(std::ifstream& infile, std::string fileName){
     if(!infile.good()) {
       std::stringstream error_msg;
-      error_msg << "File "<< filename << " could not be opened: ";
+      error_msg << "File "<< fileName << " could not be opened: ";
       
       if ( (infile.rdstate() & std::ifstream::failbit ) != 0 )
 	error_msg << "Logical error on i/o operation" << std::endl;
@@ -94,10 +94,10 @@ public:
     }
   }
 
-  static void checkFileError(std::ofstream& infile, std::string filename){
+  static void checkFileError(std::ofstream& infile, std::string fileName){
     if(!infile.good()) {
       std::stringstream error_msg;
-      error_msg << "File "<< filename << " could not be opened: ";
+      error_msg << "File "<< fileName << " could not be opened: ";
 
       if ( (infile.rdstate() & std::ifstream::failbit ) != 0 )
         error_msg << "Logical error on i/o operation" << std::endl;
