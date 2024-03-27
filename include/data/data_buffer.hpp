@@ -62,12 +62,26 @@ namespace IO {
 
 
         template <typename DTYPE>
+        void loadData(std::size_t startByte, std::shared_ptr<std::vector<DTYPE>> dataBuffer) {
+            DataBuffer<DTYPE>* derived = dynamic_cast<DataBuffer<DTYPE>*>(this);
+
+            if (derived) {
+                derived->buffer = dataBuffer;
+                derived->nBytes = dataBuffer->size() * sizeof(DTYPE);
+                derived->nElements = dataBuffer->size();
+                derived-> startByte = startByte;
+            } else {
+                throw std::bad_cast(); 
+            }
+        }
+
+        template <typename DTYPE>
         std::shared_ptr<std::vector<DTYPE>> getBuffer() {
             const DataBuffer<DTYPE>* derived = dynamic_cast<const DataBuffer<DTYPE>*>(this);
             if (derived) {
                 return derived->getTypedBuffer();
             } else {
-                throw std::bad_cast(); // or return nullptr, depending on how you want to handle the error
+                throw std::bad_cast(); 
             }
         }
     };
@@ -90,6 +104,8 @@ namespace IO {
                 buffer = std::make_shared<std::vector<DTYPE>>(nBytes);
                 nElements = nBytes / sizeof(DTYPE);
             }
+            
+            
 
             /**
              * @brief Destroys the DataBuffer object.
@@ -120,6 +136,9 @@ namespace IO {
              */
             void clearBuffer() override {
                 buffer->clear();
+                nElements = 0;
+                startByte = 0;
+                nBytes = 0;
             }
 
             /**
