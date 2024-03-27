@@ -1,5 +1,9 @@
 #include <string>
 #include <vector>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <cassert>
 
 
 
@@ -13,11 +17,11 @@
 */
 
 template <typename T> 
-std::vector<T> generateListFromAsciiRangeFile(std::string ifile) {
-    td::ifstream infile;
+std::vector<T> generateListFromAsciiRangeFile(const std::string ifile) {
+    std::ifstream infile;
     std::string str;
     infile.open(ifile.c_str(), std::ifstream::in);
-    ErrorChecker::checkFileError(infile, dm_file);
+    ErrorChecker::checkFileError(infile, ifile);
     std::vector<T> outList;
 
     while (!infile.eof())
@@ -29,7 +33,7 @@ std::vector<T> generateListFromAsciiRangeFile(std::string ifile) {
         // if : not in string, directly convert and add number
         // if : in string, split and add range
         if (str.find(':') == std::string::npos)
-            outList.push_back(std::atof(ss.c_str()));
+            outList.push_back(std::atof(str.c_str()));
 
         else
         {
@@ -46,17 +50,18 @@ std::vector<T> generateListFromAsciiRangeFile(std::string ifile) {
                 outList.push_back(k);
         }
     }
+    return outList;
 }
 /**
  * Standard mask file has 1 for good channels and 0 for bad channels
  * 
 */
 template <typename T> 
-std::vector<T> generateListFromAsciiMaskFile(std::string ifile, int size) {
+std::vector<T> generateListFromAsciiMaskFile(const std::string ifile, int size) {
     std::ifstream infile;
     std::string str;
-    infile.open(filename.c_str(), std::ifstream::in);
-    ErrorChecker::checkFileError(infile, filename);
+    infile.open(ifile.c_str(), std::ifstream::in);
+    ErrorChecker::checkFileError(infile, ifile);
 
     std::vector<T> outList(size, 1);
 
@@ -76,11 +81,11 @@ std::vector<T> generateListFromAsciiMaskFile(std::string ifile, int size) {
         std::cout <<  "WARNING: number of lines not the same as input size, attempting to parse as a range mask. " << std::endl;
         for(int ii = 0; ii < lines.size(); ii++){
 
-            if (!str.find(':') {
+            if (!str.find(':')) {
                 outList[std::atoi(lines[ii].c_str())] = 0;
             }
             else {
-                std::stringstream ss(lines[ii]]);
+                std::stringstream ss(lines[ii]);
                 std::string token;
                 std::vector<std::string> tokens;
                 while (std::getline(ss, token, ':'))
@@ -96,9 +101,9 @@ std::vector<T> generateListFromAsciiMaskFile(std::string ifile, int size) {
 
             }
         }
-    
+    }
 
-
+    return outList;
 
 
 }
