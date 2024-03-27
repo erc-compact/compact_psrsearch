@@ -12,7 +12,9 @@ namespace IO {
             std::shared_ptr<std::vector<DEDISP_OUTPUT_TYPE>> dedispersedData;
             std::shared_ptr<std::vector<DEDISP_OUTPUT_TYPE>> fullDedispersedData;
 
-            std::size_t totalNSamples; // this is set to all samples or the gulped samples based on whether we are writing to file or not
+            std::size_t totalNSamples; 
+            std::size_t gulpNSamples;  
+            std::size_t nSamplesWritten;          
             std::size_t dmListSize;
             std::string outDir;
             std::string outPrefix;
