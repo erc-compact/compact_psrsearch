@@ -5,6 +5,7 @@
 #include <iostream>
 #include <new>
 #include <algorithm>
+#include <memory>
 #include "exceptions.hpp"
 
 template <typename T>
@@ -92,9 +93,25 @@ void writeToFileAndVerify(FILE *file, std::size_t count, T *buffer) {
     if (countRead != count) throw FileIOError(count, countRead, "write");
 }
 
+template <typename T>
+void readFromFileStreamAndVerify(std::ifstream &file, std::size_t count, std::shared_ptr<std::vector<T>> buffer) {
+    file.read(reinterpret_cast<char *>(buffer->data()), count * sizeof(T));
+    if (file.gcount() != count * sizeof(T)) throw FileIOError(count, file.gcount() / sizeof(T), "read");
+}
+
+template <typename T>
+void writeToFileStreamAndVerify(std::ofstream &file, std::size_t count, std::shared_ptr<std::vector<T>> buffer) {
+    file.write(reinterpret_cast<char *>(buffer->data()), count * sizeof(T));
+    if (file.fail()) throw FileIOError(count, 0, "write");
+}
+
+
+
 
 int fileOpen(FILE **file, const std::string absolutename, const std::string mode);
 bool flleExists(const std::string name);
 int checkSize(unsigned long req, unsigned long got);
 bool caseInsensitiveCompare(const std::string& s1, const std::string& s2);
 std::string removeWhiteSpace(const std::string& str);
+std::string replaceExtension(const std::string& fileName, const std::string& newExtension);
+

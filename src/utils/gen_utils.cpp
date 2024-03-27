@@ -60,14 +60,24 @@ bool caseInsensitiveCompare(const std::string& s1, const std::string& s2) {
     );
 }
 
-std::string getExtension(const std::string& filename) {
+std::string getExtension(const std::string& fileName) {
     std::string::size_type idx;
-    idx = filename.rfind('.');
+    idx = fileName.rfind('.');
 
     if (idx != std::string::npos)
-        return filename.substr(idx + 1);
+        return fileName.substr(idx + 1);
     else
         return "";
+}
+
+std::string replaceExtension(const std::string& fileName, const std::string& newExtension) {
+    std::string::size_type idx;
+    idx = fileName.rfind('.');
+
+    if (idx != std::string::npos)
+        return fileName.substr(0, idx) + "." + newExtension;
+    else
+        return fileName + "." + newExtension;
 }
 
 
