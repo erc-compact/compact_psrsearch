@@ -16,7 +16,10 @@ TCLAP_HOME = /homes/vkrishnan/dev/
 CC = nvcc
 
 # Compiler flags
-CXXFLAGS = -Wall --std c++17 -Wextra -O2 -I $(PHOME)/include/ -lpermissive -I $(TCLAP_HOME) -I $(CUDA_HOME)/include -I $(DEDISP_HOME)/include/
+CXXFLAGS = --std c++17 -O2 -I $(PHOME)/include/  -I $(TCLAP_HOME) -I $(CUDA_HOME)/include -I $(DEDISP_HOME)/include/ 
+
+# Linker flags
+LDFLAGS = -L $(CUDA_HOME)/lib64 -L $(DEDISP_HOME)/lib/ -L $(PHOME)/lib/  -ldedisp  -lcufft -lcudart -lpthread
 
 # Source files
 SRCS := $(wildcard src/*.cpp) $(wildcard src/**/*.cpp)
@@ -36,7 +39,7 @@ all: $(TARGET)
 
 # Link object files into executable
 $(TARGET): $(OBJS)
-	$(CC) $(CXXFLAGS) $^ -o $@
+	$(CC) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Clean up object files and executable
 clean:
