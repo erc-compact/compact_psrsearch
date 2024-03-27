@@ -92,7 +92,7 @@ void PrestoTimeSeries::writeHeader(){
  * Copied from presto:ioinf.c and modified to C++ style
 */
 
-void readInfLineValStr(std::ifstream& infofile, std::string& valstr, const std::string& errdesc) {
+void PrestoTimeSeries::readInfLineValStr(std::ifstream& infofile, std::string& valstr, const std::string& errdesc) {
     std::string line;
     std::getline(infofile, line);
     if (!line.empty() && line[0] != '\n') {

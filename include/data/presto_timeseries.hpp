@@ -7,7 +7,7 @@ namespace IO{
     class PrestoTimeSeries : public SearchModeFile{
         public:
             PrestoTimeSeries(std::string fileName, std::string mode);
-            ~PrestoTimeSeries();
+            virtual ~PrestoTimeSeries() = default;
 
 
             bool isHeaderSeparate();
@@ -20,6 +20,9 @@ namespace IO{
 
             void readNBytes(std::size_t startByte, std::size_t nBytes); 
             void writeNBytes();
+
+        private:
+            void readInfLineValStr(std::ifstream& infofile, std::string& valstr, const std::string& errdesc);
 
 
            
