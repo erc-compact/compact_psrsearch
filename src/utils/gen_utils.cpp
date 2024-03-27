@@ -20,7 +20,7 @@ int fileOpen(FILE **file, const std::string absolutename, const std::string mode
 }
 
 
-bool flleExists(const std::string name) {
+bool fileExists(const std::string name) {
 
     struct stat buffer;
     return (stat(name.c_str(), &buffer) == 0);

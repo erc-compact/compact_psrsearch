@@ -109,7 +109,7 @@ void writeToFileStreamAndVerify(std::ofstream &file, std::size_t count, std::sha
 
 
 int fileOpen(FILE **file, const std::string absolutename, const std::string mode);
-bool flleExists(const std::string name);
+bool fileExists(const std::string name);
 int checkSize(unsigned long req, unsigned long got);
 bool caseInsensitiveCompare(const std::string& s1, const std::string& s2);
 std::string removeWhiteSpace(const std::string& str);
