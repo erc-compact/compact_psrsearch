@@ -58,6 +58,26 @@ class FileIOError : public CustomException
     }
 };
 
+class FunctionalityNotImplemented : public CustomException
+{
+  public:
+    FunctionalityNotImplemented(std::string msg) 
+    {
+        std::string message = "Functionality not implemented: " + msg;
+        this->message = message;
+    }
+};
+
+class InvalidInputs : public CustomException
+{
+  public:
+    InvalidInputs(std::string msg) 
+    {
+        std::string message = "Invalid inputs: " + msg;
+        this->message = message;
+    }
+};
+
 
 
 
