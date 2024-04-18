@@ -7,7 +7,7 @@
 namespace IO {
     class MultiTimeSeries {
         private:
-            std::vector<float> dmList;
+            std::shared_ptr<std::vector<float>> dmList;
             std::vector<std::shared_ptr<SearchModeFile>> outFiles;
             std::shared_ptr<std::vector<DEDISP_OUTPUT_TYPE>> dedispersedData;
             std::shared_ptr<std::vector<DEDISP_OUTPUT_TYPE>> fullDedispersedData;
@@ -22,10 +22,11 @@ namespace IO {
             bool shouldWriteToFile;
 
         public:
+            MultiTimeSeries(std::shared_ptr<std::vector<float>> dmList, std::size_t gulpNSamples, std::size_t totalNSamples, bool shouldWriteToFile);
+            MultiTimeSeries(std::shared_ptr<std::vector<float>> dmList, std::size_t gulpNSamples, bool shouldWriteToFile);
+            MultiTimeSeries(std::shared_ptr<std::vector<float>> dmList, std::size_t gulpNSamples, std::size_t totalNSamples);
 
-            
-            MultiTimeSeries(std::vector<float> dmList, std::string outDir, std::string outPrefix, std::string outSuffix, std::string outputFormat);
-            MultiTimeSeries(std::vector<float> dmList, std::size_t gulpNSamples, std::size_t totalNSamples);
+            void initOutputOptions(std::string outDir, std::string outPrefix, std::string outSuffix, std::string outputFormat, std::shared_ptr<IO::SearchModeFile> searchModeFile);
             std::shared_ptr<std::vector<DEDISP_OUTPUT_TYPE>> getCurrentDedispersedDataPtr();
             void flush();
             virtual ~MultiTimeSeries() = default;
