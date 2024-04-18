@@ -13,36 +13,47 @@
 #include <cassert>
 #include <memory>
 #include <iostream>
-#include <filesystem>
 
 TCLAP::CmdLine APP::ArgsBase::cmd("dedisperse", ' ', "0.1");
 
 
 
 int main(int argc, char ** argv){
+
  
 
     DedisperseCommandArgs args;
-    args.parseAll(argc, argv);  
-    
+    APP::ArgsBase::parseAll(argc, argv); 
+     
+
     std::shared_ptr<IO::SearchModeFile> searchModeFile = IO::SearchModeFile::createInstance(args.inputFile, READ, args.inputFormat);
-    std::vector<float> fullDmList;
-     if(!args.dmFile.empty() && flleExists(args.dmFile)) OPS::Dedisperser::populateDMList(fullDmList, args.dmFile);
+
+
+
+    std::shared_ptr<std::vector<float>> fullDmList = std::make_shared<std::vector<float>>();
+     if(!args.dmFile.empty() && fileExists(args.dmFile)) OPS::Dedisperser::populateDMList(fullDmList, args.dmFile);
      else OPS::Dedisperser::populateDMList(fullDmList, args.dmStart, args.dmEnd, args.dmPulseWidth, args.dmTol, 
                             searchModeFile->getValueForKey<float>(TSAMP),searchModeFile->getValueForKey<float>(FCH1),
                             searchModeFile->getValueForKey<float>(FOFF), searchModeFile->getValueForKey<int>(NCHANS));
 
-    OPS::Dedisperser dedisperser(searchModeFile, args.numGpus, fullDmList, 
-                            args.outputDir, args.outputPrefix, args.outputSuffix, args.outputFormat);
+
+    std::unique_ptr<OPS::Dedisperser> dedisperser; 
+
+    dedisperser = std::make_unique<OPS::Dedisperser>(searchModeFile, args.numGpus, fullDmList, true, args.dedispGulp);
+    std::string dataFilePrefix = args.inputFile.substr(0, args.inputFile.find_last_of("."));
+    if(args.outputPrefix.empty()) args.outputPrefix = dataFilePrefix;
 
 
+    dedisperser->setOutputOptions(args.outputDir, args.outputPrefix, args.outputSuffix, args.outputFormat, searchModeFile);
 
 
     int nChans = searchModeFile->getNChans();
 
-    std::vector<DEDISP_BOOL> killmask = !args.killFile.empty() ? 
+
+    std::shared_ptr<std::vector<DEDISP_BOOL>> killmask = !args.killFile.empty() ? 
                                             generateListFromAsciiMaskFile<DEDISP_BOOL>(args.killFile, nChans) : 
-                                            std::vector<DEDISP_BOOL>(nChans, 1);    
+                                            std::make_shared<std::vector<DEDISP_BOOL>>(nChans, 1);    
+
 
     std::size_t nBytesToRead = 0;
     std::size_t startByte = 0;
@@ -67,20 +78,25 @@ int main(int argc, char ** argv){
     assert(startByte + nBytesToRead <= searchModeFile->getTotalDataSize());
 
 
-    if (!args.killFile.empty()) dedisperser.setKillMask(args.killFile);
+    if (!args.killFile.empty()) dedisperser->setKillMask(args.killFile);
     std::size_t gulpSize = args.gulping? args.dedispGulp: nBytesToRead;
 
-    if (gulpSize < 2 * dedisperser.getMaxDelaySamples()){
-        throw CustomException("Gulp size is smaller than 2 *  maximum delay");
+
+
+    if (gulpSize < 2 * dedisperser->getMaxDelaySamples()){
+        throw InvalidInputs("Gulp size is smaller than 2 *  maximum delay");
     }
 
     std::size_t nSamplesToRead = searchModeFile->bytesToSamples(nBytesToRead);
     std::size_t bytesRead = 0;
 
     while (bytesRead < nBytesToRead){
+
+
         std::size_t bytesToRead = std::min(nBytesToRead - bytesRead, gulpSize);
 
-        dedisperser.dedisperse(startByte + bytesRead, bytesToRead);
+
+        dedisperser->dedisperse(startByte + bytesRead, bytesToRead);
         bytesRead += bytesToRead;     
 
         searchModeFile->clearBuffer();
