@@ -1,17 +1,20 @@
 #include "data/presto_timeseries.hpp"
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <stdexcept>
 #include <unistd.h> // for getlogin()
 #include "data/constants.hpp"
 #include "utils/gen_utils.hpp"
 #include "data/search_mode_file.hpp"
+#include "utils/sigproc_utils.hpp"
 #include <memory>
+#include <pwd.h>
 
 using namespace IO;
 
 PrestoTimeSeries::PrestoTimeSeries(std::string fileName, std::string mode) : SearchModeFile(fileName, mode){
-    this->headerFileName = replaceExtension(fileName, ".inf");
+    this->headerFileName = replaceExtension(fileName, "inf");
 
     this->headerFileOpenMode = mode;
     
@@ -21,8 +24,23 @@ PrestoTimeSeries::PrestoTimeSeries(std::string fileName, std::string mode) : Sea
         this->nBytesOnDisk = this->nSamps * this->nChans * this->nBits / BITS_PER_BYTE;
         this->nBytesOnRam = this->nBytesOnDisk;
     }
+
+  
+}
+
+void PrestoTimeSeries::copyHeaderFrom(std::shared_ptr<SearchModeFile> other){
+    SearchModeFile::copyHeaderFrom(other);
+    this->updateHeaderValue<int>(NCHANS, 1);
+    this->tsamp = other->getValueForKey<float>(TSAMP);
+    this->fch1 = other->getValueForKey<float>(FCH1);
+    this->foff = other->getValueForKey<float>(FOFF);
+    this->nBits = other->getValueForKey<int>(NBITS);
+    this->nSamps = other->getValueForKey<long>(NSAMPLES);
     
-   
+    this->nChans = 1;
+
+
+
 }
 
 bool PrestoTimeSeries::isHeaderSeparate(){
@@ -33,8 +51,8 @@ void PrestoTimeSeries::readNBytes(std::size_t startByte, std::size_t nBytes) {
     this->nBytesOnDisk = nBytes;
     this->nBytesOnRam = nBytes;
     this->container = std::make_unique<DataBuffer<PRESTO_DAT_TYPE>>(startByte, nBytesOnRam); 
-    std::shared_ptr<std::vector<PRESTO_DAT_TYPE>> buffer = this->container->getBuffer<PRESTO_DAT_TYPE>();
-    readFromFileAndVerify<PRESTO_DAT_TYPE>(this->dataFile, nBytesOnDisk, buffer->data());
+    std::shared_ptr<std::vector<PRESTO_DAT_TYPE>> busser = this->container->getBuffer<PRESTO_DAT_TYPE>();
+    readFromFileAndVerify<PRESTO_DAT_TYPE>(this->dataFile, nBytesOnDisk, busser->data());
 }
 
 void PrestoTimeSeries::writeNBytes() {
@@ -55,34 +73,37 @@ void PrestoTimeSeries::writeAllData(){}
  */
 void PrestoTimeSeries::writeHeader(){
 
+    std::string ra,dec;
+    std::string login = getpwuid(getuid())->pw_name;
+    sigproc_to_hhmmss(this->getValueForKey<float>(SRC_RAJ), ra);
+    sigproc_to_ddmmss(this->getValueForKey<float>(SRC_DEJ), dec);
     openHeaderFile();
-    std::string inffn = this->headerFileName;
-    std::ofstream ff(inffn);
-    if (ff.is_open()) {
-        ff << " Data file name without suffix          =  " << this->dataFileName << "\n";
-        ff << " Telescope used                         =  " << this->getValueForKey<const char *>(TELESCOPE_ID) << "\n";
-        ff << " Instrument used                        =  " << this->getValueOrDefaultForKey<const char *>(MACHINE_ID, "UNKNOWN") << "\n";
-        ff << " Object being observed                  =  " << this->getValueForKey<const char *>(SOURCE_NAME) << "\n";
-        ff << " J2000 Right Ascension (hh:mm:ss.ssss)  =  " << this->getValueForKey<const char *>(SRC_RAJ) << "\n";
-        ff << " J2000 Declination     (dd:mm:ss.ssss)  =  " << this->getValueForKey<const char *>(SRC_DEJ) << "\n";
-        ff << " Data observed by                       =  COMPACT\n";
-        ff << " Epoch of observation (MJD)             =  " << std::fixed << std::setprecision(15) << this->getValueForKey<double>(TSTART) << "\n";
-        ff << " Barycentered?           (1=yes, 0=no)  =  " << this->getValueOrDefaultForKey<double>(BARYCENTRIC,0) << "\n";
-        ff << " Number of bins in the time series      =  " << this->getValueForKey<long>(NSAMPLES) << "\n";
-        ff << " Width of each time series bin (sec)    =  " << std::fixed << std::setprecision(15) << this->getValueForKey<double>(TSAMP) << "\n";
-        ff << " Any breaks in the data? (1 yes, 0 no)  =  0\n";
-        ff << " Orbit removed?          (1=yes, 0=no)  =  " << 0 << "\n";
-        ff << " Type of observation (EM band)          =  Radio\n";
-        ff << " Dispersion measure (cm-3 pc)           =  " << this->getValueForKey<double>(REFDM) << "\n";
-        ff << " Central freq of low channel (Mhz)      =  " << this->fch1 << "\n";
-        ff << " Total bandwidth (Mhz)                  =  " << (this->nChans * this->foff) << "\n";        
-        ff << " Number of channels                     =  " << this->nChans << "\n";
-        ff << " Channel bandwidth (Mhz)                =  " << this->foff << "\n";
-        ff << " Data analyzed by                       =  " << getlogin() << "\n";
-        ff << " Any additional notes:\n"
-           << "    File written by COMPACT's pulsar search package\n";
-    }
-    ff.close();
+    prettyPrintHeader();
+    std::stringstream ss;
+    ss << " Data file name without suffix          =  " << this->dataFileName << "\n";
+    ss << " Telescope used                         =  " << this->getValueForKey<int>(TELESCOPE_ID) << "\n";
+    ss << " Instrument used                        =  " << this->getValueOrDefaultForKey<int>(MACHINE_ID, -1) << "\n";
+    ss << " Object being observed                  =  " << "J1818-1422" << "\n";
+    ss << " J2000 Right Ascension (hh:mm:ss.ssss)  =  " << ra << "\n";
+    ss << " J2000 Declination     (dd:mm:ss.ssss)  =  " << dec << "\n";
+    ss << " Data observed by                       =  COMPACT\n";
+    ss << " Epoch of observation (MJD)             =  " << std::fixed << std::setprecision(15) << this->getValueForKey<float>(TSTART) << "\n";
+    ss << " Barycentered?           (1=yes, 0=no)  =  " << this->getValueOrDefaultForKey<int>(BARYCENTRIC,0) << "\n";
+    ss << " Number of bins in the time series      =  " << this->getValueForKey<long>(NSAMPLES) << "\n";
+    ss << " Width of each time series bin (sec)    =  " << std::fixed << std::setprecision(15) << this->getValueForKey<float>(TSAMP) << "\n";
+    ss << " Any breaks in the data? (1 yes, 0 no)  =  0\n";
+    ss << " Orbit removed?          (1=yes, 0=no)  =  " << 0 << "\n";
+    ss << " Type of observation (EM band)          =  Radio\n";
+    ss << " Dispersion measure (cm-3 pc)           =  " << this->getValueForKey<float>(REFDM) << "\n";
+    ss << " Central freq of low channel (Mhz)      =  " << this->getValueForKey<float>(FCH1) << "\n";
+    ss << " Total bandwidth (Mhz)                  =  " << std::fixed << std::setprecision(6) << this->getValueForKey<float>(BW) << "\n";        
+    ss << " Number of channels                     =  " << this->nChans << "\n";
+    ss << " Channel bandwidth (Mhz)                =  " << this->getValueForKey<float>(FOFF) << "\n";
+    ss << " Data analyzed by                       =  " << login << "\n";
+    ss << " Any additional notes:\n";
+    ss    << "    File written by COMPACT's pulsar search package\n";
+    writeToFileAndVerify<const char>(this->headerFile, ss.str().size(), ss.str().c_str());
+
 
 }
 

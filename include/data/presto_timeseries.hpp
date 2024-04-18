@@ -4,16 +4,17 @@ namespace IO{
 
     typedef float PRESTO_DAT_TYPE;
 
-    class PrestoTimeSeries : public SearchModeFile{
+    class PrestoTimeSeries : public SearchModeFile, DedispersedFile{
         public:
             PrestoTimeSeries(std::string fileName, std::string mode);
             virtual ~PrestoTimeSeries() = default;
 
-
+            
             bool isHeaderSeparate();
 
             void readHeader();
             void writeHeader();
+            void copyHeaderFrom(std::shared_ptr<SearchModeFile> other);
 
             void readAllData();
             void writeAllData();
