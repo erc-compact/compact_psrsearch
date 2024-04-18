@@ -40,11 +40,12 @@ class DedisperseCommandArgs: public APP::DataFileReadArgs, public APP::FileWrite
         TCLAP::ValueArg<float> argDmStart{"", "dm_start", "First DM to dedisperse to. (default =0)",false, 0.0, "float"};
         TCLAP::ValueArg<float> argDmEnd{"", "dm_end","Last DM to dedisperse to. (default = 2000)",false, 2000.0, "float"};
         TCLAP::ValueArg<float> argDmTol{"", "dm_tol","DM smearing tolerance (default=1.25)",false, 1.25, "float"};
+        TCLAP::ValueArg<float> argDmPulseWidth{"", "dm_pulse_width","minimum intrinsic pulse width in us (default=64 us)",false, 64.0, "float"};
         TCLAP::ValueArg<std::string> argDmFile{"", "dm_file","File with list of DMs to dedisperse to",false, "", "float"};
         TCLAP::ValueArg<size_t> argDedispGulp{"", "dedisp_gulp","Number of samples to dedisperse at a time",false, 0, "size_t"};
         TCLAP::SwitchArg argBarycentre{"", "barycentre", "Barycentre the data before dedispersion"};
         TCLAP::ValueArg<int> argNumGpus{"", "num_gpus", "Number of GPUs to use for dedispersion",false, 1, "int"};
-        TCLAP::ValueArg<int> argRamLimitGB{"", "", "Maximum amount of data to load into host RAM at a time (in GB)",false, 0, "int"};
+        TCLAP::ValueArg<int> argRamLimitGB{"", "", "Maximum amount of data to load into host RAM at a time (in GB)",false, 100, "int"};
 
         /**
          * @brief Constructs a DedisperseCommandArgs object with default values.
@@ -57,12 +58,13 @@ class DedisperseCommandArgs: public APP::DataFileReadArgs, public APP::FileWrite
                                 dmFile(""), 
                                 barycentre(0),
                                 numGpus(1),
-                                ramLimitGB(0)
+                                ramLimitGB(100)
         {
-            ArgsBase::registerParser(typeid(*this).name(), std::bind(&DedisperseCommandArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), [this](int argc, char** argv) { DedisperseCommandArgs::parse(argc, argv); });
             ArgsBase::cmd.add(argDmStart);
             ArgsBase::cmd.add(argDmEnd);
             ArgsBase::cmd.add(argDmTol);
+            ArgsBase::cmd.add(argDmPulseWidth);
             ArgsBase::cmd.add(argDmFile);
             ArgsBase::cmd.add(argDedispGulp);
             ArgsBase::cmd.add(argBarycentre);
@@ -85,6 +87,7 @@ class DedisperseCommandArgs: public APP::DataFileReadArgs, public APP::FileWrite
             dmStart = argDmStart.getValue();
             dmEnd = argDmEnd.getValue();
             dmTol = argDmTol.getValue();
+            dmPulseWidth = argDmPulseWidth.getValue();
             dmFile = argDmFile.getValue();
             gulping = argDedispGulp.isSet();
             dedispGulp = argDedispGulp.getValue();
