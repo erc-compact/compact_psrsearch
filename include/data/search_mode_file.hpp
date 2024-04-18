@@ -26,7 +26,9 @@ namespace IO
     class DedispersedFile{ 
         public: 
             float dm;
-            DedispersedFile(float dm) : dm(dm) {}    
+            void setDM(float dm){
+                this->dm = dm;
+            }
      };
 
 
@@ -35,7 +37,8 @@ namespace IO
 
         public:
             static std::shared_ptr<SearchModeFile> createInstance(std::string fileName, std::string mode, std::string fileType);
-            static inline std::string guessFileType(std::string file_name); 
+            static std::string guessFileType(std::string file_name); 
+            static std::string getExtension(std::string file_name);
 
 
         public:
@@ -71,7 +74,7 @@ namespace IO
             std::size_t nBytesOnDisk;
             std::size_t nBytesOnRam;
             std::size_t gulpSize;
-            std::unique_ptr<DataBufferBase> container;
+            std::shared_ptr<DataBufferBase> container;
         
 
             
@@ -79,6 +82,8 @@ namespace IO
             void prettyPrintHeader();
             HeaderParamBase *getHeaderParam(const std::string key);
             void removeHeaderParam(const std::string key);
+            bool isParamInHeader(const std::string key);
+            virtual void copyHeaderFrom(std::shared_ptr<SearchModeFile> other);
 
             /**
              * Virtual functions to be implemented by the child classes
@@ -99,7 +104,7 @@ namespace IO
             virtual void writeAllData() = 0;
 
             virtual void readNBytes(std::size_t start_byte = 0, std::size_t nbytes = 0) = 0;
-            // virtual void writeNBytes() = 0;
+            virtual void writeNBytes() = 0;
 
             void readNSamps(std::size_t startSample = 0, std::size_t nSamps = 0);
             void readNSecs(double startSecs = 0, double nsecs = 0);
@@ -123,20 +128,36 @@ namespace IO
 
             double getMean();
             double getRMS();
+            template <typename DTYPE>
+            void loadData(std::size_t startByte, std::shared_ptr<std::vector<DTYPE>> dataChunk){                
+                this->container = std::make_shared<DataBuffer<DTYPE>>(startByte, dataChunk->size() * sizeof(DTYPE));        
+                this->container->loadData<DTYPE>(startByte, dataChunk);
+            }
 
+            template <typename DTYPE>
+            void writeNBytes(std::size_t startByte, std::shared_ptr<std::vector<DTYPE>> dataChunk) {
+                this->loadData<DTYPE>(startByte, dataChunk);
+                this->writeNBytes();
 
-
+            }
 
             template <typename T>
             void addToHeader(const std::string key, const std::string dtype, T value) {
-                HeaderParamBase *base = getHeaderParam(key);
-                if (base != NULL) {
+                if(isParamInHeader(key)) {
+                    HeaderParamBase *base = getHeaderParam(key);
                     static_cast<HeaderParam<T> *>(base)->value = value;
+    
                 }
                 else {
                     HeaderParam<T> *param = new HeaderParam<T>(key, dtype, value);
                     headerParams.insert(std::pair<std::string, HeaderParamBase *>(key, param));
                 }
+            }
+
+            template<typename T>
+            void updateHeaderValue(const std::string key, T value) {
+                HeaderParamBase *base = getHeaderParam(key);
+                if (base != NULL) static_cast<HeaderParam<T> *>(base)->value = value;
             }
             
             template <typename T>
@@ -196,8 +217,6 @@ namespace IO
 
             virtual ~SearchModeFile()
             {
-            // for (std::vector<HeaderParamBase *>::iterator it = headerParams.begin(); it != headerParams.end(); ++it)
-            //     delete *it;
             
             for (std::map<std::string, HeaderParamBase *>::iterator it = headerParams.begin(); it != headerParams.end(); ++it)
                 delete it->second;

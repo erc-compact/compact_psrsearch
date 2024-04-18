@@ -30,10 +30,10 @@ SearchModeFile::SearchModeFile(std::string fileName, std::string mode) {
     this->nBytesOnRam = 0;
 
     this->container = nullptr;
+
 }
 
 std::shared_ptr<SearchModeFile> SearchModeFile::createInstance(std::string fileName, std::string mode, std::string fileType){
-
 
             if(fileType.empty()){
                 fileType = guessFileType(fileName);
@@ -51,7 +51,7 @@ std::shared_ptr<SearchModeFile> SearchModeFile::createInstance(std::string fileN
             else if (caseInsensitiveCompare(fileType, "tim") || 
                      caseInsensitiveCompare(fileType, "sigproc_timeseries")){
                     return std::make_shared<SigprocTimeSeries>(fileName, mode);
-            }
+        }
             else{
                 throw FileFormatNotRecognised(fileType);
             }
@@ -73,6 +73,23 @@ std::string SearchModeFile::guessFileType(std::string fileName){
             return fileType;
         }
 
+std::string SearchModeFile::getExtension(std::string format){
+    if (caseInsensitiveCompare(format, "filterbank") || caseInsensitiveCompare(format, "sigproc_filterbank") || caseInsensitiveCompare(format, "fil")){
+        return "fil";
+    }
+    else if (caseInsensitiveCompare(format, "presto_timeseries") || caseInsensitiveCompare(format, "presto")|| caseInsensitiveCompare(format, "dat")){
+        return "dat";
+    }
+    else{
+        throw FileFormatNotRecognised(format);
+    }
+
+}
+
+
+ bool SearchModeFile::isParamInHeader(const std::string key){
+    return headerParams.find(key) != headerParams.end();
+ }
 
 
 /**
@@ -85,7 +102,7 @@ HeaderParamBase* SearchModeFile::getHeaderParam(const std::string key) {
 
     std::map<std::string, HeaderParamBase *>::iterator it = headerParams.find(key);
     if (it != headerParams.end()) return it->second;
-    return nullptr;
+    else throw HeaderParamNotFound(key);
 }
 
 void SearchModeFile::removeHeaderParam(const std::string key) {
@@ -96,9 +113,10 @@ void SearchModeFile::removeHeaderParam(const std::string key) {
     
 }
 
+
+
 void SearchModeFile::prettyPrintHeader() {
     int max_key_length = 3, max_value_length = 5;
-
     //iterate through the header params and find the max key and value length
     for (std::map<std::string, HeaderParamBase *>::iterator it = headerParams.begin(); it != headerParams.end(); ++it)
     {
@@ -129,7 +147,6 @@ void SearchModeFile::printHeader() {
         HeaderParamBase *base = it->second;
         if (!base->inheader)
             continue;
-        std::cerr << base->key << "(" << base->dtype << "): ";
         if (base->dtype == std::string(INT))
         {
             std::cerr << (static_cast<HeaderParam<int> *>(base))->value << std::endl;
@@ -170,6 +187,12 @@ void SearchModeFile::printHeader() {
     }
 }
 
+void SearchModeFile::copyHeaderFrom(std::shared_ptr<SearchModeFile> other){
+    for (const auto& pair : other->headerParams) {
+        headerParams[pair.first] = pair.second->clone();
+    }
+}
+
 std::size_t SearchModeFile::samplesToBytes(std::size_t nsamples) {
     int nChans = getValueForKey<int>(NCHANS);
     int nBits = getValueForKey<int>(NBITS);
@@ -185,7 +208,7 @@ std::size_t SearchModeFile::bytesToSamples(std::size_t nBytes) {
 }
 
 std::size_t SearchModeFile::timeToBytes(std::size_t nsecs) {
-    std::size_t samples = nsecs / getValueForKey<double>(TSAMP);
+    std::size_t samples = nsecs / getValueForKey<float>(TSAMP);
     return samplesToBytes(samples);
 }
 
@@ -263,7 +286,7 @@ std::size_t SearchModeFile::nSamplesInBuffer() {
 
 void IO::SearchModeFile::openHeaderFile()
 {
-    if (this->headerFileOpen || !this->isHeaderSeparate())
+    if (this->headerFileOpen)
         return;
 
     fileOpen(&headerFile, this->headerFileName, this->headerFileOpenMode);
@@ -272,7 +295,7 @@ void IO::SearchModeFile::openHeaderFile()
 
 void IO::SearchModeFile::closeHeaderFile()
 {
-    if (!this->headerFileOpen || !this->isHeaderSeparate())
+    if (!this->headerFileOpen)
         return;
     fclose(headerFile);
     this->headerFileOpen = false;
@@ -290,6 +313,8 @@ void IO::SearchModeFile::openDataFile()
 
 void IO::SearchModeFile::closeDataFile()
 {
+    if (!this->dataFileOpen)
+        return;
     fclose(dataFile);
     this->dataFileOpen = false;
 }
