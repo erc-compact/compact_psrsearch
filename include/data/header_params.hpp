@@ -18,6 +18,29 @@ namespace IO {
         std::string dtype; /**< Data type of the parameter. Specified in header_keys.dat */
         std::string key; /**< Key associated with the parameter. */
 
+
+        /**
+         * @brief Constructor for the HeaderParamBase class.
+         */
+        HeaderParamBase() {}
+
+        /**
+         * @brief Constructor for the HeaderParamBase class.
+         * @param key The key associated with the header parameter.
+         * @param dtype The data type of the header parameter.
+         */
+        HeaderParamBase(std::string key, std::string dtype) {
+            this->key = key;
+            this->dtype = dtype;
+            this->inheader = false;
+        }
+
+        HeaderParamBase(const HeaderParamBase &d) {
+            this->key = d.key;
+            this->dtype = d.dtype;
+            this->inheader = d.inheader;
+        }
+
         /**
          * @brief Overloaded equality operator.
          * @param d The HeaderParamBase object to compare with.
@@ -26,7 +49,6 @@ namespace IO {
         
         bool operator==(const HeaderParamBase &d) const 
         {
-            std::cerr << this->key << " " << d.key << std::endl;
             return (this->key == d.key);
         }
 
@@ -57,6 +79,9 @@ namespace IO {
          */
         virtual void print() = 0;
 
+
+        virtual HeaderParamBase* clone() = 0;
+
         /**
          * @brief Destructor for the HeaderParamBase class.
          */
@@ -85,12 +110,12 @@ namespace IO {
          * 
          * This class encapsulates a header parameter, which consists of a key and a data type.
          */
-        inline HeaderParam(std::string key, std::string dtype) {
-            this->key = key;
-            this->dtype = dtype;
-            this->inheader = false;
-        }
+        inline HeaderParam(std::string key, std::string dtype): HeaderParamBase(key, dtype) {}
 
+        //copy constructor
+        inline HeaderParam(const HeaderParam &d): HeaderParamBase(d) {
+            this->value = d.value;
+        }
         /**
          * @brief Constructs a HeaderParam object with the specified key, data type, and value.
          * 
@@ -160,6 +185,10 @@ namespace IO {
          */
         int getValueLength() {
             return std::to_string(this->value).length();
+        }
+
+        HeaderParamBase* clone(){
+            return new HeaderParam<T>(this);
         }
         
 
