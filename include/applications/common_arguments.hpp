@@ -39,13 +39,21 @@ namespace APP {
          * @param f The parser function to register.
          */
         static void registerParser(std::string name, std::function<void(int, char **)> f) {
-            // add function to map with class name as key
-            std::string className = name;
-            functionMap[className] = f;
+
+            if (functionMap.find(name) == functionMap.end()) {
+               
+                // add function to map with class name as key
+                std::string className = name;
+                functionMap[className] = f;
+            }
+    
+
         }
 
     public:
-        ArgsBase() {}
+        ArgsBase() {
+            ArgsBase::registerParser(typeid(*this).name(), [this](int argc, char** argv) { ArgsBase::parse(argc, argv); });
+        }
         ~ArgsBase() {}
 
         /**
@@ -53,9 +61,7 @@ namespace APP {
          * @param argc The number of command line arguments.
          * @param argv The array of command line arguments.
          */
-        virtual void parse(int argc, char **argv) {
-            ArgsBase::cmd.parse(argc, argv);
-        }
+        virtual void parse(int argc, char **argv) {};
 
         /**
          * @brief Parses all registered command line arguments.
@@ -65,6 +71,7 @@ namespace APP {
         static void parseAll(int argc, char **argv) {
             try {
                 //iterate over all entries of function Map 
+                ArgsBase::cmd.parse(argc, argv);
                 for (auto &f : functionMap) {
                     f.second(argc, argv);
                 }
@@ -150,7 +157,7 @@ namespace APP {
          */
         CommonArgs() : verboseLevel("WARN"),
                        progressBar(false) {
-            ArgsBase::registerParser(typeid(*this).name(), std::bind(&CommonArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), [this](int argc, char** argv) { CommonArgs::parse(argc, argv); });
             ArgsBase::cmd.add(argVerbose);
             ArgsBase::cmd.add(argProgressBar);
         }
@@ -162,7 +169,7 @@ namespace APP {
          */
         void parse(int argc, char **argv) override {
             verboseLevel = argVerbose.getValue();
-            progressBar = argProgressBar.getValue();
+            progressBar = argProgressBar.getValue();            
         }
 
         
@@ -223,7 +230,7 @@ namespace APP {
                              killFile(NULL_STR),
                              birdiesFile(NULL_STR) {
 
-            ArgsBase::registerParser(typeid(*this).name() , std::bind(&DataFileReadArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), [this](int argc, char** argv) { DataFileReadArgs::parse(argc, argv); });
 
             ArgsBase::cmd.add(argStartByte);
             ArgsBase::cmd.add(argNBytes);
@@ -248,9 +255,11 @@ namespace APP {
          */
         inline void parse(int argc, char **argv) override {
 
+
             checkExclusivity(std::vector<TCLAP::Arg*>{&argStartByte, &argNBytes}, 
                             std::vector<TCLAP::Arg*>{&argStartSample, &argNSamps}, 
                             std::vector<TCLAP::Arg*>{&argStartSec, &argNSecs});
+
             startByte = argStartByte.getValue();
             nBytes = argNBytes.getValue();
             startSample = argStartSample.getValue();
@@ -311,7 +320,7 @@ namespace APP {
                          outputFormat("presto_timeseries"),
                          outputPrefix(""),
                          outputSuffix("") {
-            ArgsBase::registerParser(typeid(*this).name(), std::bind(&FileWriteArgs::parse, this, std::placeholders::_1, std::placeholders::_2));
+            ArgsBase::registerParser(typeid(*this).name(), [this](int argc, char** argv) { FileWriteArgs::parse(argc, argv); });
             ArgsBase::cmd.add(argOutputDir);
             ArgsBase::cmd.add(argOutputFormat);
             ArgsBase::cmd.add(argOutputPrefix);
