@@ -3,6 +3,7 @@
 #include "data/search_mode_file.hpp"
 #include "data/constants.hpp"
 #include "utils/gen_utils.hpp"
+#include "exceptions.hpp"
 #include <string>
 #include <math.h>
 #include <cstring>
@@ -13,22 +14,28 @@
  * @param file_name The name of the file.
  * @param mode The mode in which the file should be opened.
  */
-IO::SigprocFilterbank::SigprocFilterbank(std::string file_name, std::string mode): SearchModeFile(file_name, mode)
+IO::SigprocFilterbank::SigprocFilterbank(std::string fileName, std::string mode): SearchModeFile(fileName, mode)
 {
+
 
     readHeaderKeys();
     this->headerFileOpenMode = mode;
     this->dataFileOpenMode = mode;    
 
+    this->dataFileName = fileName;
+    this->headerFileName = fileName;
+
     if (mode == READ)
     {
         readHeader();
+
         this->nBytesOnDisk = this->nSamps * this->nChans * this->nBits / BITS_PER_BYTE;
         this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
+
     }
     else if (mode == WRITE)
     {
-        std::cerr << "Nothing to initialise for " << mode << " mode for file: " << file_name << std::endl;
+        std::cerr << "Nothing to initialise for " << mode << " mode for file: " << fileName << std::endl;
     }
 }
 
@@ -58,6 +65,10 @@ void IO::SigprocFilterbank::readHeaderKeys()
         {
             headerParams.insert(std::make_pair(key, new HeaderParam<int>(key, dtype)));
         }
+        else if (!dtype.compare(std::string(FLOAT)))
+        {
+             headerParams.insert(std::make_pair(key, new HeaderParam<float>(key, dtype)));
+        }
         else if (!dtype.compare(std::string(DOUBLE)))
         {
              headerParams.insert(std::make_pair(key, new HeaderParam<double>(key, dtype)));
@@ -71,6 +82,8 @@ void IO::SigprocFilterbank::readHeaderKeys()
             headerParams.insert(std::make_pair(key, new HeaderParam<char *>(key, dtype)));
         }
     }
+
+
 
 }
 
@@ -92,8 +105,8 @@ bool IO::SigprocFilterbank::isHeaderSeparate()
  */
 void IO::SigprocFilterbank::readHeader()
 {
-
     openHeaderFile();
+
     rewind(headerFile);
 
     int iter = 0;
@@ -133,19 +146,21 @@ void IO::SigprocFilterbank::readHeader()
                     int nChans = getValueForKey<int>(NCHANS);
                     int nBits = getValueForKey<int>(NBITS);
                     int nifs = getValueForKey<int>(NIFS);
-                    double tsamp = getValueForKey<double>(TSAMP);
+                    float tsamp = getValueForKey<float>(TSAMP);
                     int nbytes = nBits / 8;
                     long nsamples = dataBytes / (nChans * nbytes * nifs);
                     double tobs = nsamples * tsamp;
                     addToHeader<long>(NSAMPLES, LONG, nsamples);
                     addToHeader<double>(TOBS, DOUBLE, tobs);
+                    addToHeader<float>(BW, FLOAT, getValueForKey<int>(NCHANS) * getValueForKey<float>(FOFF));
+
 
                     this->nChans = nChans;
                     this->nBits = nBits;
                     this->nSamps = nsamples;
                     this->tsamp = tsamp;
-                    this->fch1 = getValueForKey<double>(FCH1);
-                    this->foff = getValueForKey<double>(FOFF);
+                    this->fch1 = getValueForKey<float>(FCH1);
+                    this->foff = getValueForKey<float>(FOFF);
                     break;
                 }
 
@@ -155,15 +170,22 @@ void IO::SigprocFilterbank::readHeader()
                     HeaderParamBase *header_param = getHeaderParam(header_key_bytes);
                     std::string dtype = header_param->dtype;
                     header_param->inheader = true;
-                    if (dtype == std::string(INT))
+                    if (dtype == INT)
                     {
                         static_cast<HeaderParam<int> *>(header_param)->value = readInt();
+
                     }
-                    else if (dtype == std::string(DOUBLE))
+                    else if (dtype == DOUBLE)
                     {
                         static_cast<HeaderParam<double> *>(header_param)->value = readDouble();
+
                     }
-                    else if (dtype == std::string(STRING))
+                    else if (dtype == FLOAT)
+                    {
+                        static_cast<HeaderParam<float> *>(header_param)->value = readDouble();
+
+                    }
+                    else if (dtype == STRING || dtype == NULL_STR)
                     {
                         num_bytes = readInt();
                         if (num_bytes == 0)
@@ -177,14 +199,9 @@ void IO::SigprocFilterbank::readHeader()
                             static_cast<HeaderParam<char *> *>(header_param)->value = header_value_bytes;
                         }
                     }
-                    else if (dtype == std::string(NULL_STR))
+                    else 
                     {
-                        num_bytes = readInt();
-                        if (num_bytes == 0)
-                        {
-                            static_cast<HeaderParam<char *> *>(header_param)->value = dummy;
-                            continue;
-                        }
+                        throw InvalidInputs("Invalid dtype in header_keys.info file.");
                     }
                 }
             }
@@ -291,7 +308,7 @@ void IO::SigprocFilterbank::writeNBytes() {
 
 void IO::SigprocFilterbank::writeAllData() {}
 
-void IO::SigprocFilterbank::rewind_to_data_start()
+void IO::SigprocFilterbank::rewindToDataStart()
 {
     fseek(this->dataFile, this->headerBytes, SEEK_SET);
 }

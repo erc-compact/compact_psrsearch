@@ -36,13 +36,17 @@ namespace IO
 
         template<typename DTYPE, typename = std::enable_if_t<std::is_arithmetic<DTYPE>::value>>
         void readNBytesOfType(std::size_t startByte, std::size_t nBytes){
+            startByte += this->headerBytes;
 
             this->nBytesOnDisk = nBytes;
             this->nBytesOnRam = this->nBytesOnDisk * BITS_PER_BYTE / this->nBits;
-            this->container = std::make_unique<DataBuffer<DTYPE>>(startByte, nBytesOnRam);
+            this->container = std::make_shared<DataBuffer<DTYPE>>(startByte, nBytesOnRam);
+          
             
             std::shared_ptr<std::vector<DTYPE>> buffer = this->container->getBuffer<DTYPE>();
+
             unsigned int nBits = this->nBits;
+            this->openDataFile();
             this->goToByte(startByte);
 
             if (nBits >= 8) { // easy, just read the whole thing into buffer directly
@@ -92,23 +96,8 @@ namespace IO
             
         }
 
-        // template <typename ITYPE, typename OTYPE>
-        // void copy_data(std::shared_ptr<DataBuffer<ITYPE>> inBuffer, std::shared_ptr<DataBuffer<OTYPE>> outBuffer){
-        //     std::size_t inBufferSize = inBuffer->getNElements();
-        //     std::size_t outBufferSize = outBuffer->getNElements();
 
-        //     std::shared_ptr<ITYPE []> inBuffer = std::dynamic_pointer_cast<ITYPE[]>(inBuffer->getBuffer());
-        //     std::shared_ptr<OTYPE []> outBuffer = std::dynamic_pointer_cast<OTYPE[]>(outBuffer->getBuffer());
-            
-        //     for(std::size_t i = 0; i < inBufferSize; ++i){
-        //         outBuffer[i] = inBuffer[i];
-        //     } 
-            
-            
-            
-        // }
-
-        void rewind_to_data_start();
+        void rewindToDataStart();
 
         // void plot_data(std::size_t start_sample, std::size_t num_samples, bool fscrunch);
         int readInt();
