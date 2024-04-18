@@ -24,34 +24,37 @@ namespace OPS {
 
         std::shared_ptr<IO::SearchModeFile> searchModeFile;
 
-        std::vector<float> dmList;
-        float maxDelaySamples;
+        std::shared_ptr<std::vector<float>> dmList;
+        std::size_t maxDelaySamples;
 
-        std::vector<DEDISP_BOOL> killmask;
+        std::shared_ptr<std::vector<DEDISP_BOOL>> killmask;
         std::unique_ptr<IO::MultiTimeSeries> multiTimeSeries;
 
         bool writeToFile;
+        bool gulping;
+        std::size_t gulpNSamples;
 
         
 
     public:
     
-        static void populateDMList(std::vector<float>& dmList, const std::string dmFile);
-        static void populateDMList(std::vector<float>& dmList, float dmStart, float dmEnd, double width, double dmTol, 
+        static void populateDMList(std::shared_ptr<std::vector<float>> dmList, const std::string dmFile);
+        static void populateDMList(std::shared_ptr<std::vector<float>> dmList, float dmStart, float dmEnd, double width, double dmTol, 
                         double tSamp, double f0, double channelBW, int nChans);
 
     public:
-        Dedisperser(std::shared_ptr<IO::SearchModeFile> searchModeFile, unsigned int numGpus, std::vector<float> dmList, 
-                        std::string outputDir, std::string outputPrefix, std::string outputSuffix, 
-                        std::string outputFormat);
-        Dedisperser(std::shared_ptr<IO::SearchModeFile> searchModeFile, unsigned int numGpus, std::vector<float> dmList);
+        Dedisperser(std::shared_ptr<IO::SearchModeFile> searchModeFile, unsigned int numGpus, std::shared_ptr<std::vector<float>> dmList, bool writeToFile, std::size_t gulpNSamples);
+
+
+       void setOutputOptions(std::string outputDir, std::string outputPrefix, std::string outputSuffix, 
+                       std::string outputFormat, std::shared_ptr<IO::SearchModeFile> searchModeFile);
 
         virtual ~Dedisperser()
         {
             dedisp_destroy_plan(plan);
         }
 
-        std::vector<float> getDMList()
+        std::shared_ptr<std::vector<float>> getDMList()
         {
             return dmList;
         }
@@ -59,8 +62,8 @@ namespace OPS {
             return maxDelaySamples;
         }   
 
-        void setDMList(std::vector<float>& dmList);
-        void setKillMask(std::vector<int> killmask_in);
+        void setDMList(std::shared_ptr<std::vector<float>> dmList);
+        void setKillMask(std::shared_ptr<std::vector<int>> killmask_in);
         void setKillMask(std::string fileName);
         void writeData();
         // void dedisperse(IO::SearchModeFile *search_file, DEDISP_OUTPUT_TYPE *out_data);
@@ -68,10 +71,13 @@ namespace OPS {
 
         void dedisperse(std::size_t startByte, std::size_t nBytesToRead){
 
+
             searchModeFile->readNBytes(startByte, nBytesToRead);
+
 
             std::size_t nSamplesIn = searchModeFile->bytesToSamples(nBytesToRead);
             std::size_t nSamplesOut = nSamplesIn - maxDelaySamples;
+
 
             std::shared_ptr<std::vector<DEDISP_OUTPUT_TYPE>> dedispersedData = multiTimeSeries->getCurrentDedispersedDataPtr();
 
@@ -85,7 +91,7 @@ namespace OPS {
                 case 8:
                 {
                     std::shared_ptr<std::vector<uint8_t>> inBuffer = searchModeFile->container->getBuffer<uint8_t>();
-                    error = dedisp_execute(plan, nSamplesIn, inBuffer->data(), 8, reinterpret_cast<uint8_t*>(dedispersedData->data()),  32, (unsigned) 0);
+                    error = dedisp_execute(this->plan, nSamplesIn, inBuffer->data(), 8, reinterpret_cast<uint8_t*>(dedispersedData->data()),  32, (unsigned) 0);
                     break;
                 }
                 case 16:
