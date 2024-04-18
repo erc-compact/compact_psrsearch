@@ -7,8 +7,8 @@
 
 const std::string HEADER_START = "HEADER_START";
 const std::string HEADER_END = "HEADER_END";
-const std::string NCHANS = "nChans";
-const std::string NBITS = "nBits";
+const std::string NCHANS = "nchans";
+const std::string NBITS = "nbits";
 const std::string NIFS = "nifs";
 const std::string TSAMP = "tsamp";
 const std::string TSTART = "tstart";
@@ -19,6 +19,8 @@ const std::string MACHINE_ID = "machine_id";
 const std::string TELESCOPE_ID = "telescope_id";
 const std::string BARYCENTRIC= "barycentric";
 const std::string REFDM = "refdm";
+const std::string BW = "bw";
+
 
 
 const std::string NSAMPLES = "nsamples";
@@ -29,9 +31,10 @@ const std::string FOFF = "foff";
 const std::string CHANNELBW = "foff";
 
 
-const std::string HEADER_KEYS_FILE ="resources/header_keys.dat";
+const std::string HEADER_KEYS_FILE ="resources/header_keys.info";
 const std::string INT = "int";
 const std::string DOUBLE = "double";
+const std::string FLOAT = "float";
 const std::string STRING = "string";
 const std::string LONG = "long";
 const std::string NULL_STR = "null";
